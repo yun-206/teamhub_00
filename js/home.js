@@ -1,8 +1,7 @@
 /* 허브 메인 — 벤토 카드 렌더링 */
-(function () {
+window.Hub.boot(function () {
   'use strict';
   const H = window.Hub;
-  if (!H.requireMe()) return;
   const { $, esc, icon, TEAM, TOOLS, team, ST } = H;
   H.renderShell('home');
 
@@ -126,4 +125,4 @@
   document.addEventListener('hub:team', () => { renderTeam(); renderStats(); renderActivity(); });
   document.addEventListener('hub:tick', () => { renderTeam(); renderStats(); });
   document.addEventListener('hub:activity', renderActivity);
-})();
+});

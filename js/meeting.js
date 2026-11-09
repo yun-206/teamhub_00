@@ -1,8 +1,7 @@
 /* 회의 일정 데모 — 주간 캘린더 + 새 회의 모달 (저장: localStorage, 막히면 메모리) */
-(function () {
+window.Hub.boot(function () {
   'use strict';
   const H = window.Hub;
-  if (!H.requireMe()) return;
   const { $, esc, icon, team } = H;
   H.renderShell('meeting');
   const fillIcons = () => document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = icon(el.dataset.ic, el.closest('.btn') ? 16 : 18); });
@@ -140,7 +139,8 @@
   $('#fPeople').onchange = checkConflict;
 
   function err(fieldId, msgId, msg) { $('#' + msgId).textContent = msg; const f = $('#' + fieldId).closest('.fld'); if (f) f.classList.toggle('is-err', !!msg); return !msg; }
-  $('#mtgForm').addEventListener('submit', (e) => {
+  let saving = false;
+  $('#mtgForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const title = $('#fTitle').value.trim(), date = $('#fDate').value, start = $('#fStart').value, end = $('#fEnd').value, ppl = picked();
     const ok = [
@@ -150,7 +150,12 @@
       err('fPeople', 'ePeople', ppl.length ? '' : '참석자를 한 명 이상 골라 주세요'),
     ];
     if (ok.includes(false)) { const first = document.querySelector('.fld.is-err input, .fld.is-err select'); if (first) first.focus(); return; }
-    const item = H.meetings.add({ title, date, start, end, attendees: ppl, place: $('#fPlace').value.trim(), by: team.meId() });
+    if (saving) return;
+    saving = true; $('#mtgSave').disabled = true;
+    let item;
+    try { item = await H.meetings.add({ title, date, start, end, attendees: ppl, place: $('#fPlace').value.trim(), by: team.meId() }); }
+    catch (er) { console.warn(er); H.toast('회의를 저장하지 못했어요 · 연결을 확인해 주세요'); return; }
+    finally { saving = false; $('#mtgSave').disabled = false; }
     H.activity.add('회의를 잡았어요', `${title} · ${H.dayLabel(date)} ${start}`);
     try { sessionStorage.setItem('teamhub-new', item.id); } catch (er) {}
     flashId = item.id;
@@ -183,7 +188,10 @@
       ${m.by ? `<p class="muted" style="font-size:13px">${esc(H.member(m.by).name)} 님이 만든 회의예요.</p>` : ''}`;
     $('#dFoot').innerHTML = `<button class="btn btn--danger" type="button" id="dDel">${icon('trash', 16)}회의 삭제</button><button class="btn btn--accent" type="button" id="dOk">확인</button>`;
     $('#dOk').onclick = () => dd.close();
-    $('#dDel').onclick = () => { H.meetings.remove(m.id); H.activity.add('회의를 취소했어요', m.title); dd.close(); render(); H.toast(`'${m.title}' 회의를 지웠어요`); };
+    $('#dDel').onclick = async () => {
+      try { await H.meetings.remove(m.id); } catch (er) { console.warn(er); H.toast('회의를 지우지 못했어요 · 연결을 확인해 주세요'); return; }
+      H.activity.add('회의를 취소했어요', m.title); dd.close(); render(); H.toast(`'${m.title}' 회의를 지웠어요`);
+    };
     dd.showModal();
   }
   $('#dClose').onclick = () => dd.close();
@@ -209,4 +217,4 @@
   // 9시 근처로 스크롤(데스크톱 그리드)
   if (sc) sc.scrollTop = Math.max(0, (9 - START_H) * HOUR_PX - 8);
   if (params.get('new')) openNew();
-})();
+});
