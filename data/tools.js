@@ -20,7 +20,4 @@ const KPOP_LIVE_TRACKER_URL = 'https://kpop-checker.vercel.app/';
 window.HUB_TOOLS = [
   { id: 'kpop-live-tracker', name: 'K-pop Live Tracker', desc: '케이팝 해외공연 데이터를 조립하고 순위를 매기고 검증해요', href: KPOP_LIVE_TRACKER_URL, icon: 'chart', status: '운영 중', owner: '데이터 TF', updated: '2026-11-02', tags: ['데이터', '검증', '엑셀'], featured: true },
   { id: 'meeting', name: '회의 일정 잡기', desc: '팀 주간 캘린더에서 회의를 잡고 참석자를 모아요', href: 'meeting.html', icon: 'calendar', status: '데모', owner: '팀 공용', updated: '2026-11-09', tags: ['협업', '일정'] },
-  { id: 'report-qc', name: '보고서 QC 도우미', desc: '개조식·표기 원칙에 맞는지 보고서 초안을 점검해요', href: '', icon: 'doc', status: '준비 중', owner: '정책연구 TF', tags: ['보고서'] },
-  { id: 'venue-master', name: '공연장 마스터', desc: '공연장별 공식 수용인원과 출처를 한곳에서 관리해요', href: '', icon: 'venue', status: '준비 중', owner: '데이터 TF', tags: ['데이터'] },
-  { id: 'press-scrap', name: '해외 보도 스크랩', desc: 'K-컬처 해외 보도를 모아 주간 요약을 만들어요', href: '', icon: 'news', status: '준비 중', owner: '팀 공용', tags: ['모니터링'] },
 ];
