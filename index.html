@@ -59,8 +59,11 @@
           <div class="bento c-12" id="tools" style="grid-column: span 12"></div>
 
           <section class="card c-4" id="notices" aria-labelledby="ntTitle" tabindex="-1">
-            <div class="card__head"><h2 class="card__title" id="ntTitle"><span data-ic="megaphone"></span>공지사항</h2></div>
-            <ul class="list" id="noticeList"></ul>
+            <div class="card__head"><h2 class="card__title" id="ntTitle"><span data-ic="megaphone"></span>공지사항</h2><a class="card__more" href="notices.html">전체 보기<span data-ic="arrow"></span></a></div>
+            <ul class="list" id="noticeList" aria-live="polite"></ul>
+            <div class="card__foot">
+              <button class="btn btn--ghost btn--sm" type="button" id="noticeWrite"><span data-ic="edit"></span>공지 쓰기</button>
+            </div>
           </section>
 
           <section class="card c-4" aria-labelledby="acTitle">

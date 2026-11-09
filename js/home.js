@@ -5,7 +5,7 @@ window.Hub.boot(function () {
   const { $, esc, icon, TEAM, TOOLS, team, ST } = H;
   H.renderShell('home');
 
-  document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = icon(el.dataset.ic, el.closest('.btn') ? 16 : 18); });
+  document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = icon(el.dataset.ic, el.closest('.btn') ? 16 : el.closest('.card__more') ? 14 : 18); });
   $('#upIcon').outerHTML = icon('calendar', 18);
   $('#upArrow').outerHTML = icon('arrow', 14);
   $('#plusIc').outerHTML = icon('plus', 16);
@@ -93,8 +93,15 @@ window.Hub.boot(function () {
   }
   document.addEventListener('hub:search', (e) => renderTools(e.detail));
 
-  /* 공지 (아직 쓰기 기능 없음 → 빈 상태) */
-  $('#noticeList').innerHTML = `<li class="empty empty--box">${icon('megaphone', 22)}<b>아직 올라온 공지가 없어요</b></li>`;
+  /* 공지 — 최근 3개 */
+  function renderNotices() {
+    const list = H.notices.all().slice(0, 3), seen = H.notifs.seenAt('notice'), meId = team.meId();
+    $('#noticeList').innerHTML = list.length ? list.map(n => `<li><a class="nl" href="notices.html#n-${esc(n.id)}">
+        <span class="tag${n.tag === '공지' ? '' : ' tag--gray'}">${esc(n.tag)}</span>
+        <span class="grow nl__txt"><b>${esc(n.title)}${n.author !== meId && n.at > seen ? ' <i class="new-dot" aria-label="새 공지"></i>' : ''}</b><small>${esc(H.member(n.author).name)} · ${esc(H.ago(n.at))}</small></span></a></li>`).join('')
+      : `<li class="empty empty--box">${icon('megaphone', 22)}<b>아직 올라온 공지가 없어요</b><span>'공지 쓰기'로 팀에 첫 소식을 알려 보세요</span></li>`;
+  }
+  $('#noticeWrite').onclick = () => H.openNoticeEditor();
 
   /* 최근 활동 — 실제로 한 일(입장·회의 만들기/삭제)만 */
   function renderActivity() {
@@ -109,7 +116,7 @@ window.Hub.boot(function () {
     const meId = team.meId();
     const list = team.list().map(m => ({ m, st: team.status(m.id) }))
       .sort((a, b) => (b.m.id === meId) - (a.m.id === meId) || ORDER[a.st] - ORDER[b.st] || a.m.joinedAt - b.m.joinedAt);
-    $('#teamList').innerHTML = list.map(({ m, st }) => `<li>${H.avatar(m.id)}<span class="grow who"><b>${esc(m.name)}${m.id === meId ? ' <span class="muted" style="font-weight:500">(나)</span>' : ''}</b><small>${esc(m.role)} · ${esc(TEAM.name)}</small></span><span class="st st--${st}" aria-hidden="true"></span><span class="when">${ST[st]}</span></li>`).join('')
+    $('#teamList').innerHTML = list.map(({ m, st }) => { const un = m.id === meId ? 0 : H.messages.unreadFrom(m.id); return `<li>${H.avatar(m.id)}<span class="grow who"><b>${esc(m.name)}${m.id === meId ? ' <span class="muted" style="font-weight:500">(나)</span>' : ''}</b><small>${esc(m.role)} · ${esc(TEAM.name)}</small></span><span class="st st--${st}" aria-hidden="true"></span><span class="when">${ST[st]}</span>${m.id === meId ? '<span class="dm-btn dm-btn--ghost" aria-hidden="true"></span>' : `<a class="dm-btn" href="messages.html?to=${encodeURIComponent(m.id)}" aria-label="${esc(m.name)} 님에게 쪽지${un ? `, 안 읽은 쪽지 ${un}개` : ''}" title="쪽지 보내기">${icon('chat', 16)}${un ? `<i class="badge badge--sm">${un}</i>` : ''}</a>`}</li>`; }).join('')
       + (list.length < 2 ? `<li class="empty empty--hint">초대 링크로 팀원을 불러 보세요</li>` : '');
     const on = list.filter(x => x.st !== 'offline').length;
     $('#onlineCount').textContent = `${list.length}명 · 접속 ${on}명`;
@@ -121,6 +128,9 @@ window.Hub.boot(function () {
   renderTools('');
   refresh();
   renderActivity();
+  renderNotices();
+  document.addEventListener('hub:notices', renderNotices);
+  document.addEventListener('hub:messages', renderTeam);
   document.addEventListener('hub:meetings', () => { renderStats(); renderUpcoming(); renderActivity(); });
   document.addEventListener('hub:team', () => { renderTeam(); renderStats(); renderActivity(); });
   document.addEventListener('hub:tick', () => { renderTeam(); renderStats(); });

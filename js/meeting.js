@@ -214,6 +214,8 @@ window.Hub.boot(function () {
     if (sig !== teamSig && !dlg.open && !dd.open) { teamSig = sig; render(); }
   });
   render();
+  H.notifs.markSeen('meeting');   // 회의 화면을 열었으면 회의 초대 알림은 본 것으로
+  document.dispatchEvent(new CustomEvent('hub:meetings'));
   // 9시 근처로 스크롤(데스크톱 그리드)
   if (sc) sc.scrollTop = Math.max(0, (9 - START_H) * HOUR_PX - 8);
   if (params.get('new')) openNew();
