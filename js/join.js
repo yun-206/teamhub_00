@@ -73,6 +73,18 @@
       location.replace('index.html');
     });
 
+    // 초대 링크로 왔는데 이 기기에 이미 입장한 사람이 있으면 → '○○ 님으로 계속하기' 먼저
+    //   (실수로 링크를 다시 눌러도 다시 가입하는 것처럼 보이지 않게. 시연용 '다른 사람처럼 들어오기'는 아래 작은 버튼)
+    const prev = invited ? team.me() : null;
+    if (prev) {
+      $('#contWho').innerHTML = `<span class="av-wrap">${H.avatar(prev.id, 'av--xl')}</span><span><b>${esc(prev.name)}</b><small>${esc(prev.role)} · ${esc(TEAM.name)}</small></span>`;
+      $('#contGo').textContent = `${prev.name} 님으로 계속하기`;
+      $('#contGo').onclick = () => { team.signIn(prev.id, true); location.replace('index.html'); };
+      $('#contOther').onclick = () => { $('#contBox').hidden = true; $('.steps').hidden = false; step(1); };
+      $('#contBox').hidden = false; $('.steps').hidden = true; $('#pwForm').hidden = true; $('#infoForm').hidden = true;
+      setTimeout(() => $('#contGo').focus(), 30);
+      return;
+    }
     step(1);
   });
 })();

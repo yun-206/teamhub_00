@@ -551,3 +551,15 @@ a.tool:hover .tool__arrow { transform: translateX(3px); color: var(--accent-hi);
   .bub { max-width: 88%; }
   .notif__panel { position: fixed; left: 12px; right: 12px; top: 70px; width: auto; }
 }
+
+/* v5: 초대 링크 다시 눌렀을 때 '○○ 님으로 계속하기' */
+.cont { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.cont[hidden], .steps[hidden] { display: none; }
+.cont .join__sub { margin-top: -6px; }
+.cont__who { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.cont__who > span:last-child { display: flex; flex-direction: column; line-height: 1.35; }
+.cont__who b { font-size: 17px; }
+.cont__who small { font-size: 13px; color: var(--muted); }
+.av--xl { width: 64px; height: 64px; font-size: 20px; }
+.cont__other { font-size: 13px; color: var(--muted); }
+.cont__other:hover { color: var(--accent-hi); }

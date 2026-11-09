@@ -28,6 +28,15 @@
     </div>
 
     <section class="card join__card" aria-labelledby="jTitle">
+      <!-- 이미 이 기기에 입장한 사람이 초대 링크를 다시 눌렀을 때 -->
+      <div class="cont" id="contBox" hidden>
+        <div class="cont__who" id="contWho"></div>
+        <h1 class="join__title" id="contTitle" tabindex="-1">이미 들어와 있어요</h1>
+        <p class="join__sub">이 기기에서는 이미 Team KW 팀원으로 입장해 있어요. 그대로 계속하면 돼요.</p>
+        <button class="btn btn--accent join__go" type="button" id="contGo"></button>
+        <button class="link-btn cont__other" type="button" id="contOther">다른 사람으로 입장하기</button>
+      </div>
+
       <ol class="steps" aria-label="입장 단계">
         <li class="is-on" id="s1Dot"><span>1</span>비밀번호</li>
         <li id="s2Dot"><span>2</span>내 정보</li>
