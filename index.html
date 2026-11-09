@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>팀 허브 · 데모</title>
+  <meta name="description" content="업무 툴과 팀 협업 기능을 한곳에 모은 팀 허브 시연용 프로토타입(가상 데이터).">
+  <meta name="theme-color" content="#121212">
+  <script>/* K-pop Live Tracker와 같은 테마 저장 키 */
+    try { if (localStorage.getItem('tourdata-theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2301539f'/%3E%3Cpath d='M9 22V10m7 12V14m7 8v-5' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="css/hub.css">
+  <script src="data/tools.js" defer></script>
+  <script src="data/mock.js" defer></script>
+  <script src="js/hub-core.js" defer></script>
+  <script src="js/home.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <div class="shell">
+    <aside class="side" id="side" aria-label="사이드바"></aside>
+    <div class="scrim" id="scrim" aria-hidden="true"></div>
+    <div class="main-col">
+      <header class="top" id="top"></header>
+      <main class="page" id="main" tabindex="-1">
+        <div class="bento" id="bento">
+
+          <section class="card welcome c-8" aria-labelledby="hello">
+            <div>
+              <p class="welcome__date" id="today"></p>
+              <h1 id="hello"></h1>
+              <p>오늘 필요한 툴과 일정을 여기서 바로 열 수 있어요.</p>
+            </div>
+            <div class="stats" id="stats"></div>
+          </section>
+
+          <section class="card c-4 r-2" aria-labelledby="upTitle">
+            <div class="card__head">
+              <h2 class="card__title" id="upTitle"><span id="upIcon"></span>다가오는 일정</h2>
+              <a class="card__more" href="meeting.html">캘린더<span id="upArrow"></span></a>
+            </div>
+            <ul class="agenda" id="upcoming" aria-live="polite"></ul>
+            <div class="card__foot">
+              <a class="btn btn--accent btn--sm" href="meeting.html?new=1" id="newMeetingLink"><span id="plusIc"></span>새 회의 만들기</a>
+            </div>
+          </section>
+
+          <a class="card feature c-8" id="feature" href="#"></a>
+
+          <div class="sect">
+            <h2>업무 툴</h2>
+            <p id="toolCount"></p>
+          </div>
+          <div class="bento c-12" id="tools" style="grid-column: span 12"></div>
+
+          <section class="card c-4" id="notices" aria-labelledby="ntTitle" tabindex="-1">
+            <div class="card__head"><h2 class="card__title" id="ntTitle"><span data-ic="megaphone"></span>공지사항</h2></div>
+            <ul class="list" id="noticeList"></ul>
+          </section>
+
+          <section class="card c-4" aria-labelledby="acTitle">
+            <div class="card__head"><h2 class="card__title" id="acTitle"><span data-ic="pulse"></span>최근 활동</h2></div>
+            <ul class="list" id="activityList"></ul>
+          </section>
+
+          <section class="card c-4" id="team" aria-labelledby="tmTitle" tabindex="-1">
+            <div class="card__head"><h2 class="card__title" id="tmTitle"><span data-ic="users"></span>팀원</h2><span class="muted" style="font-size:13px" id="onlineCount"></span></div>
+            <ul class="list" id="teamList"></ul>
+          </section>
+
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

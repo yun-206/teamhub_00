@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>회의 일정 · 팀 허브 데모</title>
+  <meta name="description" content="팀 주간 캘린더에서 회의를 잡는 시연용 데모(가상 데이터).">
+  <meta name="theme-color" content="#121212">
+  <script>
+    try { if (localStorage.getItem('tourdata-theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2301539f'/%3E%3Cpath d='M9 22V10m7 12V14m7 8v-5' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="css/hub.css">
+  <script src="data/tools.js" defer></script>
+  <script src="data/mock.js" defer></script>
+  <script src="js/hub-core.js" defer></script>
+  <script src="js/meeting.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <div class="shell">
+    <aside class="side" id="side" aria-label="사이드바"></aside>
+    <div class="scrim" id="scrim" aria-hidden="true"></div>
+    <div class="main-col">
+      <header class="top" id="top"></header>
+      <main class="page" id="main" tabindex="-1">
+        <a class="back" href="index.html" id="backLink"><span data-ic="back"></span>허브로 돌아가기</a>
+
+        <div class="page__head">
+          <div>
+            <h1 class="page__title">회의 일정</h1>
+            <p class="page__sub">빈 시간을 누르거나 '새 회의 만들기'로 회의를 잡아요. 만든 회의는 허브의 '다가오는 일정'에도 바로 보여요.</p>
+          </div>
+          <button class="btn btn--accent" type="button" id="newBtn"><span data-ic="plus"></span>새 회의 만들기</button>
+        </div>
+
+        <div class="cal card">
+          <div class="cal__bar">
+            <div class="cal__nav">
+              <button class="icon-btn" type="button" id="prevWk" aria-label="지난주"><span data-ic="back"></span></button>
+              <button class="btn btn--ghost btn--sm" type="button" id="todayBtn">오늘</button>
+              <button class="icon-btn" type="button" id="nextWk" aria-label="다음 주"><span data-ic="arrow"></span></button>
+            </div>
+            <h2 class="cal__range" id="range" aria-live="polite"></h2>
+            <p class="cal__legend"><span class="lg lg--me"></span>내가 참석 <span class="lg"></span>팀 일정</p>
+          </div>
+          <div class="cal__scroll">
+            <div class="week" id="week" role="grid" aria-label="주간 캘린더"></div>
+          </div>
+          <div class="agenda-m" id="agendaM"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 새 회의 모달 -->
+  <dialog class="modal" id="mtgDialog" aria-labelledby="mtgTitle">
+    <form method="dialog" id="mtgForm" novalidate>
+      <div class="modal__head">
+        <h2 id="mtgTitle">새 회의 만들기</h2>
+        <button class="icon-btn" type="button" id="mtgClose" aria-label="닫기"><span data-ic="close"></span></button>
+      </div>
+      <div class="modal__body">
+        <label class="fld">
+          <span>제목 <em>*</em></span>
+          <input type="text" id="fTitle" maxlength="40" placeholder="예: 데이터 점검 회의" autocomplete="off" required>
+          <small class="fld__err" id="eTitle"></small>
+        </label>
+        <div class="fld-row">
+          <label class="fld"><span>날짜 <em>*</em></span><input type="date" id="fDate" required><small class="fld__err" id="eDate"></small></label>
+          <label class="fld"><span>시작</span><select id="fStart"></select></label>
+          <label class="fld"><span>종료</span><select id="fEnd"></select></label>
+        </div>
+        <small class="fld__err" id="eTime"></small>
+        <label class="fld">
+          <span>장소</span>
+          <input type="text" id="fPlace" maxlength="30" placeholder="예: 3층 소회의실 / 온라인" autocomplete="off">
+        </label>
+        <fieldset class="fld">
+          <legend>참석자 <em>*</em></legend>
+          <div class="people" id="fPeople"></div>
+          <small class="fld__err" id="ePeople"></small>
+        </fieldset>
+        <p class="conflict" id="conflict" hidden></p>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn--ghost" type="button" id="mtgCancel">취소</button>
+        <button class="btn btn--accent" type="submit" id="mtgSave">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 회의 상세 -->
+  <dialog class="modal modal--sm" id="detailDialog" aria-labelledby="dTitle">
+    <div class="modal__head">
+      <h2 id="dTitle"></h2>
+      <button class="icon-btn" type="button" id="dClose" aria-label="닫기"><span data-ic="close"></span></button>
+    </div>
+    <div class="modal__body" id="dBody"></div>
+    <div class="modal__foot" id="dFoot"></div>
+  </dialog>
+</body>
+</html>
