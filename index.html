@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>팀 허브 · 데모</title>
-  <meta name="description" content="업무 툴과 팀 협업 기능을 한곳에 모은 팀 허브 시연용 프로토타입(가상 데이터).">
+  <title>Team KW · 팀 허브</title>
+  <meta name="description" content="업무 툴과 팀 협업 기능을 한곳에 모은 팀 허브 시연용 프로토타입.">
   <meta name="theme-color" content="#121212">
   <script>/* K-pop Live Tracker와 같은 테마 저장 키 */
     try { if (localStorage.getItem('tourdata-theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="css/hub.css">
   <script src="data/tools.js" defer></script>
-  <script src="data/mock.js" defer></script>
+  <script src="data/team.js" defer></script>
   <script src="js/hub-core.js" defer></script>
   <script src="js/home.js" defer></script>
 </head>
@@ -70,7 +70,10 @@
 
           <section class="card c-4" id="team" aria-labelledby="tmTitle" tabindex="-1">
             <div class="card__head"><h2 class="card__title" id="tmTitle"><span data-ic="users"></span>팀원</h2><span class="muted" style="font-size:13px" id="onlineCount"></span></div>
-            <ul class="list" id="teamList"></ul>
+            <ul class="list" id="teamList" aria-live="polite"></ul>
+            <div class="card__foot">
+              <button class="btn btn--ghost btn--sm" type="button" id="inviteBtn"><span data-ic="userPlus"></span>팀원 초대하기</button>
+            </div>
           </section>
 
         </div>

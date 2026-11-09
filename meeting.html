@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>회의 일정 · 팀 허브 데모</title>
-  <meta name="description" content="팀 주간 캘린더에서 회의를 잡는 시연용 데모(가상 데이터).">
+  <title>회의 일정 · Team KW 팀 허브</title>
+  <meta name="description" content="팀 주간 캘린더에서 회의를 잡는 시연용 데모.">
   <meta name="theme-color" content="#121212">
   <script>
     try { if (localStorage.getItem('tourdata-theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="css/hub.css">
   <script src="data/tools.js" defer></script>
-  <script src="data/mock.js" defer></script>
+  <script src="data/team.js" defer></script>
   <script src="js/hub-core.js" defer></script>
   <script src="js/meeting.js" defer></script>
 </head>
@@ -33,7 +33,7 @@
         <div class="page__head">
           <div>
             <h1 class="page__title">회의 일정</h1>
-            <p class="page__sub">빈 시간을 누르거나 '새 회의 만들기'로 회의를 잡아요. 만든 회의는 허브의 '다가오는 일정'에도 바로 보여요.</p>
+            <p class="page__sub">빈 시간을 누르거나 '새 회의 만들기'로 회의를 잡아요. 만든 회의는 허브의 '다가오는 일정'과 팀원 화면에도 바로 보여요.</p>
           </div>
           <button class="btn btn--accent" type="button" id="newBtn"><span data-ic="plus"></span>새 회의 만들기</button>
         </div>
@@ -83,6 +83,7 @@
         <fieldset class="fld">
           <legend>참석자 <em>*</em></legend>
           <div class="people" id="fPeople"></div>
+          <p class="hint" id="peopleHint" hidden>아직 팀원이 나뿐이에요. 허브의 '팀원 초대하기'로 팀원을 불러오면 여기에 보여요.</p>
           <small class="fld__err" id="ePeople"></small>
         </fieldset>
         <p class="conflict" id="conflict" hidden></p>

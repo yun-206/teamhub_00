@@ -1,7 +1,9 @@
 /* 회의 일정 데모 — 주간 캘린더 + 새 회의 모달 (저장: localStorage, 막히면 메모리) */
 (function () {
   'use strict';
-  const H = window.Hub, { $, esc, icon, MOCK } = H;
+  const H = window.Hub;
+  if (!H.requireMe()) return;
+  const { $, esc, icon, team } = H;
   H.renderShell('meeting');
   const fillIcons = () => document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = icon(el.dataset.ic, el.closest('.btn') ? 16 : 18); });
   fillIcons();
@@ -48,7 +50,7 @@
       const slots = hours.map(x => `<button type="button" class="slot" style="height:${HOUR_PX}px" data-date="${k}" data-h="${x}" aria-label="${d.getMonth() + 1}월 ${d.getDate()}일 ${x}시에 회의 만들기"></button>`).join('');
       const blocks = evs.map(({ m, s, e, col, cols }) => {
         const top = Math.max(0, (s - START_H * 60) / 60 * HOUR_PX), bottom = Math.min((END_H - START_H) * HOUR_PX, (e - START_H * 60) / 60 * HOUR_PX);
-        const mine = (m.attendees || []).includes('me');
+        const mine = (m.attendees || []).includes(team.meId());
         const short = bottom - top < 44;
         return `<button type="button" class="ev${mine ? ' ev--me' : ''}${m.id === flashId ? ' is-new' : ''}${short ? ' ev--short' : ''}" data-id="${esc(m.id)}"
           style="top:${top + 1}px;height:${Math.max(22, bottom - top - 2)}px;left:calc(${(100 / cols) * col}% + 3px);width:calc(${100 / cols}% - 6px)">
@@ -68,7 +70,7 @@
       const k = H.ymd(d), evs = all.filter(m => m.date === k);
       return `<section class="am__day${k === today ? ' is-today' : ''}">
         <h3><span>${d.getMonth() + 1}/${d.getDate()}</span> ${H.DOW[d.getDay()]}요일${k === today ? ' <em>오늘</em>' : ''}</h3>
-        ${evs.length ? evs.map(m => `<button type="button" class="am__ev${(m.attendees || []).includes('me') ? ' ev--me' : ''}${m.id === flashId ? ' is-new' : ''}" data-id="${esc(m.id)}">
+        ${evs.length ? evs.map(m => `<button type="button" class="am__ev${(m.attendees || []).includes(team.meId()) ? ' ev--me' : ''}${m.id === flashId ? ' is-new' : ''}" data-id="${esc(m.id)}">
           <span class="am__time">${esc(m.start)}<small>${esc(m.end)}</small></span>
           <span class="am__txt"><b>${esc(m.title)}</b><small>${esc(m.place || '장소 미정')}</small></span>${H.avatars(m.attendees || [], 3)}</button>`).join('')
           : `<button type="button" class="am__empty" data-date="${k}" data-h="10">회의 없음 · 눌러서 만들기</button>`}
@@ -87,7 +89,13 @@
   for (let m = START_H * 60; m <= END_H * 60; m += 30) times.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
   $('#fStart').innerHTML = times.slice(0, -1).map(t => `<option>${t}</option>`).join('');
   $('#fEnd').innerHTML = times.slice(1).map(t => `<option>${t}</option>`).join('');
-  $('#fPeople').innerHTML = MOCK.members.map(m => `<label class="person">${'<input type="checkbox" value="' + esc(m.id) + '">'}${H.avatar(m.id)}<span><b>${esc(m.name)}${m.id === 'me' ? ' (나)' : ''}</b><small>${esc(m.role)}</small></span></label>`).join('');
+  // 참석자 목록은 모달을 열 때마다 지금 팀원으로 다시 그림 (그 사이 새 팀원이 들어올 수 있음)
+  function renderPeople() {
+    const meId = team.meId();
+    const list = team.list().slice().sort((a, b) => (b.id === meId) - (a.id === meId) || a.joinedAt - b.joinedAt);
+    $('#fPeople').innerHTML = list.map(m => `<label class="person"><input type="checkbox" value="${esc(m.id)}">${H.avatar(m.id)}<span><b>${esc(m.name)}${m.id === meId ? ' (나)' : ''}</b><small>${esc(m.role)}</small></span></label>`).join('');
+    $('#peopleHint').hidden = list.length > 1;
+  }
 
   let opener = null;
   function openNew(date, hour) {
@@ -95,10 +103,11 @@
     $('#mtgForm').reset();
     ['eTitle', 'eDate', 'eTime', 'ePeople'].forEach(id => $('#' + id).textContent = '');
     document.querySelectorAll('.fld.is-err').forEach(el => el.classList.remove('is-err'));
+    renderPeople();
     $('#fDate').value = date || H.ymd(new Date());
     const st = String(Math.min(Math.max(hour || nextHour(), START_H), END_H - 1)).padStart(2, '0') + ':00';
     $('#fStart').value = st; syncEnd(true);
-    $('#fPeople').querySelector('input[value="me"]').checked = true;
+    const mine = $('#fPeople').querySelector(`input[value="${team.meId()}"]`); if (mine) mine.checked = true;
     checkConflict();
     dlg.showModal();
     setTimeout(() => $('#fTitle').focus(), 30);
@@ -141,7 +150,8 @@
       err('fPeople', 'ePeople', ppl.length ? '' : '참석자를 한 명 이상 골라 주세요'),
     ];
     if (ok.includes(false)) { const first = document.querySelector('.fld.is-err input, .fld.is-err select'); if (first) first.focus(); return; }
-    const item = H.meetings.add({ title, date, start, end, attendees: ppl, place: $('#fPlace').value.trim() });
+    const item = H.meetings.add({ title, date, start, end, attendees: ppl, place: $('#fPlace').value.trim(), by: team.meId() });
+    H.activity.add('회의를 잡았어요', `${title} · ${H.dayLabel(date)} ${start}`);
     try { sessionStorage.setItem('teamhub-new', item.id); } catch (er) {}
     flashId = item.id;
     base = H.weekStart(H.parseYmd(date));
@@ -170,10 +180,10 @@
       <p class="drow">${icon('clock', 16)}<span>${esc(m.start)} – ${esc(m.end)}</span></p>
       <p class="drow">${icon('pin', 16)}<span>${esc(m.place || '장소 미정')}</span></p>
       <div class="dppl">${(m.attendees || []).map(a => `<span class="chip">${H.avatar(a)}${esc(H.member(a).name)}</span>`).join('')}</div>
-      ${m.seed ? '<p class="muted" style="font-size:13px">기본 데모 일정이라 지울 수 없어요.</p>' : ''}`;
-    $('#dFoot').innerHTML = (m.seed ? '' : `<button class="btn btn--danger" type="button" id="dDel">${icon('trash', 16)}회의 삭제</button>`) + `<button class="btn btn--accent" type="button" id="dOk">확인</button>`;
+      ${m.by ? `<p class="muted" style="font-size:13px">${esc(H.member(m.by).name)} 님이 만든 회의예요.</p>` : ''}`;
+    $('#dFoot').innerHTML = `<button class="btn btn--danger" type="button" id="dDel">${icon('trash', 16)}회의 삭제</button><button class="btn btn--accent" type="button" id="dOk">확인</button>`;
     $('#dOk').onclick = () => dd.close();
-    if (!m.seed) $('#dDel').onclick = () => { H.meetings.remove(m.id); dd.close(); render(); H.toast(`'${m.title}' 회의를 지웠어요`); };
+    $('#dDel').onclick = () => { H.meetings.remove(m.id); H.activity.add('회의를 취소했어요', m.title); dd.close(); render(); H.toast(`'${m.title}' 회의를 지웠어요`); };
     dd.showModal();
   }
   $('#dClose').onclick = () => dd.close();
@@ -188,7 +198,13 @@
     if (slot) openNew(slot.dataset.date, Number(slot.dataset.h));
   });
 
-  document.addEventListener('hub:meetings', render);   // 프로필 메뉴의 '데모 일정 초기화'
+  document.addEventListener('hub:meetings', render);   // 다른 탭에서 회의를 만들거나 지우면 바로 반영
+  // 팀원 구성이 바뀌었을 때만 다시 그림 (8초마다 오는 상태 신호로는 다시 그리지 않음 → 포커스 유지)
+  let teamSig = team.list().map(m => m.id + m.name).join() + team.meId();
+  document.addEventListener('hub:team', () => {
+    const sig = team.list().map(m => m.id + m.name).join() + team.meId();
+    if (sig !== teamSig && !dlg.open && !dd.open) { teamSig = sig; render(); }
+  });
   render();
   // 9시 근처로 스크롤(데스크톱 그리드)
   if (sc) sc.scrollTop = Math.max(0, (9 - START_H) * HOUR_PX - 8);

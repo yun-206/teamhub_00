@@ -1,27 +1,35 @@
 /* 허브 메인 — 벤토 카드 렌더링 */
 (function () {
   'use strict';
-  const H = window.Hub, { $, esc, icon, MOCK, TOOLS } = H;
+  const H = window.Hub;
+  if (!H.requireMe()) return;
+  const { $, esc, icon, TEAM, TOOLS, team, ST } = H;
   H.renderShell('home');
 
-  document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = icon(el.dataset.ic, 18); });
+  document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = icon(el.dataset.ic, el.closest('.btn') ? 16 : 18); });
   $('#upIcon').outerHTML = icon('calendar', 18);
   $('#upArrow').outerHTML = icon('arrow', 14);
   $('#plusIc').outerHTML = icon('plus', 16);
 
   /* 인사 + 요약 */
-  const now = new Date(), me = H.member('me');
+  const now = new Date();
   const hi = now.getHours() < 12 ? '좋은 아침이에요' : now.getHours() < 18 ? '좋은 오후예요' : '오늘도 수고했어요';
   $('#today').textContent = `${now.getFullYear()}. ${now.getMonth() + 1}. ${now.getDate()}. ${H.DOW[now.getDay()]}요일`;
-  $('#hello').textContent = `${hi}, ${me.name.slice(1)} 님`;
+  function renderHello() {
+    const me = team.me(); if (!me) return;
+    let w = null;
+    try { w = sessionStorage.getItem('teamhub-welcome'); sessionStorage.removeItem('teamhub-welcome'); } catch (e) {}
+    $('#hello').textContent = w === 'new' ? `${TEAM.name}에 오신 걸 환영해요, ${H.shortName(me.name)} 님` : `${hi}, ${H.shortName(me.name)} 님`;
+  }
   function renderStats() {
     const ws = H.ymd(H.weekStart(now)), we = H.ymd(H.addDays(H.weekStart(now), 6));
     const week = H.meetings.all().filter(m => m.date >= ws && m.date <= we).length;
     const live = TOOLS.filter(t => t.status !== '준비 중').length;
+    const on = team.list().filter(m => team.status(m.id) !== 'offline').length;
     $('#stats').innerHTML = [
       [week, '이번 주 회의'],
       [live, '바로 쓸 수 있는 툴'],
-      [TOOLS.length - live, '준비 중인 툴'],
+      [on, '지금 접속한 팀원'],
     ].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
   }
 
@@ -37,7 +45,7 @@
           <span class="ag__title" style="display:block">${esc(m.title)}</span>
           <span class="ag__meta"><span>${icon('pin', 13)}${esc(m.place || '장소 미정')}</span>${H.avatars(m.attendees || [], 3)}</span>
         </span>
-      </a></li>`).join('') : '<li class="empty">다가오는 회의가 없어요</li>';
+      </a></li>`).join('') : `<li class="empty empty--box">${icon('calendar', 22)}<b>아직 잡힌 회의가 없어요</b><span>아래 버튼으로 첫 회의를 만들어 보세요</span></li>`;
   }
 
   /* 대표 툴 */
@@ -72,8 +80,8 @@
       <span><span class="tool__name" style="display:block">${esc(t.name)}</span><span class="tool__desc" style="display:block;margin-top:4px">${esc(t.desc)}</span></span>
       <span class="tool__foot"><span class="tool__tags">${(t.tags || []).map(x => `<span>${esc(x)}</span>`).join('')}</span>${soon ? `<span>${esc(t.owner || '')}</span>` : `<span class="tool__arrow">${icon('arrow', 18)}</span>`}</span>`;
     return soon
-      ? `<div class="card tool c-4 is-soon" data-q="${esc((t.name + ' ' + t.desc + ' ' + (t.tags || []).join(' ')).toLowerCase())}" aria-label="${esc(t.name)}, 준비 중">${inner}</div>`
-      : `<a class="card tool c-4" href="${esc(href)}"${/^https?:/.test(href) ? ' target="_blank" rel="noopener"' : ''} data-q="${esc((t.name + ' ' + t.desc + ' ' + (t.tags || []).join(' ')).toLowerCase())}">${inner}</a>`;
+      ? `<div class="card tool c-4 is-soon" aria-label="${esc(t.name)}, 준비 중">${inner}</div>`
+      : `<a class="card tool c-4" href="${esc(href)}"${/^https?:/.test(href) ? ' target="_blank" rel="noopener"' : ''}>${inner}</a>`;
   }
   function renderTools(q) {
     q = (q || '').toLowerCase();
@@ -86,17 +94,36 @@
   }
   document.addEventListener('hub:search', (e) => renderTools(e.detail));
 
-  /* 공지·활동·팀원 */
-  $('#noticeList').innerHTML = MOCK.notices.map(n => `<li><span class="tag${n.tag === '공지' ? '' : ' tag--gray'}">${esc(n.tag)}</span><span class="grow">${esc(n.title)}</span><time>${esc(n.date)}</time></li>`).join('');
-  $('#activityList').innerHTML = MOCK.activity.map(a => `<li class="act">${H.avatar(a.who)}<span class="grow"><b>${esc(H.member(a.who).name)}</b> 님이 ${esc(a.what)}<small>${esc(a.where)}</small></span><span class="when">${esc(a.ago)}</span></li>`).join('');
-  const ST = { online: '온라인', meeting: '회의 중', away: '자리 비움', offline: '오프라인' };
-  $('#teamList').innerHTML = MOCK.members.map(m => `<li>${H.avatar(m.id)}<span class="grow who"><b>${esc(m.name)}${m.id === 'me' ? ' <span class="muted" style="font-weight:500">(나)</span>' : ''}</b><small>${esc(m.role)}</small></span><span class="st st--${m.status}" aria-hidden="true"></span><span class="when">${ST[m.status]}</span></li>`).join('');
-  $('#onlineCount').textContent = `온라인 ${MOCK.members.filter(m => m.status === 'online').length}명`;
+  /* 공지 (아직 쓰기 기능 없음 → 빈 상태) */
+  $('#noticeList').innerHTML = `<li class="empty empty--box">${icon('megaphone', 22)}<b>아직 올라온 공지가 없어요</b></li>`;
 
-  function refresh() { renderStats(); renderUpcoming(); }
+  /* 최근 활동 — 실제로 한 일(입장·회의 만들기/삭제)만 */
+  function renderActivity() {
+    const list = H.activity.all().slice(0, 6);
+    $('#activityList').innerHTML = list.length ? list.map(a => `<li class="act">${H.avatar(a.who)}<span class="grow"><b>${esc(H.member(a.who).name)}</b> 님이 ${esc(a.what)}<small>${esc(a.where)}</small></span><span class="when">${esc(H.ago(a.at))}</span></li>`).join('')
+      : `<li class="empty empty--box">${icon('pulse', 22)}<b>아직 활동이 없어요</b></li>`;
+  }
+
+  /* 팀원 + 접속 상태 */
+  const ORDER = { online: 0, meeting: 1, away: 2, offline: 3 };
+  function renderTeam() {
+    const meId = team.meId();
+    const list = team.list().map(m => ({ m, st: team.status(m.id) }))
+      .sort((a, b) => (b.m.id === meId) - (a.m.id === meId) || ORDER[a.st] - ORDER[b.st] || a.m.joinedAt - b.m.joinedAt);
+    $('#teamList').innerHTML = list.map(({ m, st }) => `<li>${H.avatar(m.id)}<span class="grow who"><b>${esc(m.name)}${m.id === meId ? ' <span class="muted" style="font-weight:500">(나)</span>' : ''}</b><small>${esc(m.role)} · ${esc(TEAM.name)}</small></span><span class="st st--${st}" aria-hidden="true"></span><span class="when">${ST[st]}</span></li>`).join('')
+      + (list.length < 2 ? `<li class="empty empty--hint">초대 링크로 팀원을 불러 보세요</li>` : '');
+    const on = list.filter(x => x.st !== 'offline').length;
+    $('#onlineCount').textContent = `${list.length}명 · 접속 ${on}명`;
+  }
+  $('#inviteBtn').onclick = () => H.openInvite();
+
+  function refresh() { renderStats(); renderUpcoming(); renderTeam(); }
+  renderHello();
   renderTools('');
   refresh();
-  document.addEventListener('hub:meetings', refresh);
-  window.addEventListener('storage', (e) => { if (e.key === 'teamhub-meetings') refresh(); });
-  window.addEventListener('pageshow', (e) => { if (e.persisted) refresh(); });   // 뒤로 가기로 돌아와도 최신 일정
+  renderActivity();
+  document.addEventListener('hub:meetings', () => { renderStats(); renderUpcoming(); renderActivity(); });
+  document.addEventListener('hub:team', () => { renderTeam(); renderStats(); renderActivity(); });
+  document.addEventListener('hub:tick', () => { renderTeam(); renderStats(); });
+  document.addEventListener('hub:activity', renderActivity);
 })();
