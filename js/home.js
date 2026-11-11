@@ -1,68 +1,97 @@
-/* 홈 — 인사·요약, 이번 주 일정, 오늘 점심, 공지, 최근 활동, 멤버 */
+/* 허브 메인 — 벤토 카드 렌더링 */
 window.Hub.boot(function () {
   'use strict';
-  const H = window.Hub, { $, esc, icon, TEAM, team, ST } = H;
+  const H = window.Hub;
+  const { $, esc, icon, TEAM, TOOLS, team, ST } = H;
   H.renderShell('home');
+
   document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = icon(el.dataset.ic, el.closest('.btn') ? 16 : el.closest('.card__more') ? 14 : 18); });
+  $('#upIcon').outerHTML = icon('calendar', 18);
+  $('#upArrow').outerHTML = icon('arrow', 14);
+  $('#plusIc').outerHTML = icon('plus', 16);
 
+  /* 인사 + 요약 */
   const now = new Date();
-  const hi = now.getHours() < 11 ? '좋은 아침이에요' : now.getHours() < 14 ? '점심 맛있게 먹어요' : now.getHours() < 18 ? '좋은 오후예요' : '오늘도 수고했어요';
+  const hi = now.getHours() < 12 ? '좋은 아침이에요' : now.getHours() < 18 ? '좋은 오후예요' : '오늘도 수고했어요';
   $('#today').textContent = `${now.getFullYear()}. ${now.getMonth() + 1}. ${now.getDate()}. ${H.DOW[now.getDay()]}요일`;
-  (function hello() {
-    const me = team.me(); let w = null;
-    try { w = sessionStorage.getItem('interns-welcome'); sessionStorage.removeItem('interns-welcome'); } catch (e) {}
-    $('#hello').textContent = w === 'new' ? `${TEAM.name}에 온 걸 환영해요, ${H.shortName(me.name)} 님` : `${hi}, ${H.shortName(me.name)} 님`;
-  })();
-
+  function renderHello() {
+    const me = team.me(); if (!me) return;
+    let w = null;
+    try { w = sessionStorage.getItem('teamhub-welcome'); sessionStorage.removeItem('teamhub-welcome'); } catch (e) {}
+    $('#hello').textContent = w === 'new' ? `${TEAM.name}에 오신 걸 환영해요, ${H.shortName(me.name)} 님` : `${hi}, ${H.shortName(me.name)} 님`;
+  }
   function renderStats() {
-    const t = H.todayYmd(), out = new Set(H.schedules.on(t).map(s => s.member));
+    const ws = H.ymd(H.weekStart(now)), we = H.ymd(H.addDays(H.weekStart(now), 6));
+    const week = H.meetings.all().filter(m => m.date >= ws && m.date <= we).length;
+    const live = TOOLS.filter(t => t.status !== '준비 중').length;
     const on = team.list().filter(m => team.status(m.id) !== 'offline').length;
-    const un = H.messages.unreadTotal();
     $('#stats').innerHTML = [
-      [out.size, '오늘 일정 있는 사람', 'schedule.html'],
-      [un, '안 읽은 쪽지', 'messages.html' + (H.messages.unreadFrom('group') ? '?to=group' : '')],
-      [on, '지금 접속한 멤버', '#team'],
-    ].map(([n, l, href]) => `<a class="stat" href="${href}"><b>${n}</b><span>${l}</span></a>`).join('');
-    const offToday = H.schedules.on(t);
-    $('#helloSub').textContent = offToday.length ? `오늘은 ${offToday.map(s => `${H.shortName(H.member(s.member).name)} ${s.kind}`).join(', ')}이에요.` : '오늘은 다 같이 출근하는 날이에요.';
+      [week, '이번 주 회의'],
+      [live, '바로 쓸 수 있는 툴'],
+      [on, '지금 접속한 팀원'],
+    ].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
   }
 
-  /* 이번 주 일정 (월~일) */
-  function renderWeek() {
-    const ws = H.weekStart(now), days = [...Array(7)].map((_, i) => H.ymd(H.addDays(ws, i)));
-    const rows = days.map(d => ({ d, list: H.schedules.on(d) })).filter(x => x.list.length);
-    $('#week').innerHTML = rows.length ? rows.map(({ d, list }) => `
-      <li class="wk${d === H.todayYmd() ? ' is-today' : ''}${d < H.todayYmd() ? ' is-past' : ''}"><a href="schedule.html?date=${d}">
-        <span class="wk__day"><b>${H.parseYmd(d).getDate()}</b>${d === H.todayYmd() ? '오늘' : H.DOW[H.parseYmd(d).getDay()]}</span>
-        <span class="wk__items">${list.map(s => `<span class="chip chip--${H.schedules.kindClass(s.kind)}">${H.avatar(s.member)}<b>${esc(H.shortName(H.member(s.member).name))}</b>${esc(s.kind)}</span>`).join('')}</span>
-      </a></li>`).join('')
-      : `<li class="empty empty--box">${icon('calendar', 22)}<b>이번 주는 다 같이 있어요</b><span>연차·반차·출장이 생기면 올려 주세요</span></li>`;
+  /* 다가오는 일정 */
+  function renderUpcoming() {
+    const list = H.meetings.upcoming(5);
+    let fresh = null;
+    try { fresh = sessionStorage.getItem('teamhub-new'); sessionStorage.removeItem('teamhub-new'); } catch (e) {}
+    $('#upcoming').innerHTML = list.length ? list.map(m => `
+      <li><a class="ag${m.id === fresh ? ' is-new' : ''}" href="meeting.html?date=${m.date}">
+        <span class="ag__when"><span class="ag__day">${esc(H.dayLabel(m.date))}</span><span class="ag__time">${esc(m.start)}</span></span>
+        <span style="min-width:0">
+          <span class="ag__title" style="display:block">${esc(m.title)}</span>
+          <span class="ag__meta"><span>${icon('pin', 13)}${esc(m.place || '장소 미정')}</span>${H.avatars(m.attendees || [], 3)}</span>
+        </span>
+      </a></li>`).join('') : `<li class="empty empty--box">${icon('calendar', 22)}<b>아직 잡힌 회의가 없어요</b><span>아래 버튼으로 첫 회의를 만들어 보세요</span></li>`;
   }
-  $('#schedBtn').onclick = () => H.openScheduleEditor();
 
-  /* 오늘 점심 */
-  function renderLunch() {
-    const today = H.lunch.today()[0];
-    const c = $('#lunchCard');
-    const wheel = `<svg class="lunchcard__wheel" viewBox="0 0 100 100" aria-hidden="true">${[0, 1, 2, 3].map(i => `<path d="M50 50 L${50 + 46 * Math.sin(i * Math.PI / 2)} ${50 - 46 * Math.cos(i * Math.PI / 2)} A46 46 0 0 1 ${50 + 46 * Math.sin((i + 1) * Math.PI / 2)} ${50 - 46 * Math.cos((i + 1) * Math.PI / 2)} Z" class="seg-${i}"/>`).join('')}<circle cx="50" cy="50" r="7" class="hub"/></svg>`;
-    c.innerHTML = today ? `
-      ${wheel}
-      <span class="feature__top"><span class="pill pill--live">오늘 점심</span><span class="pill">${today.mode === 'wheel' ? '돌림판' : '랜덤 뽑기'}</span></span>
-      <div>
-        <h2 class="sr" id="lcTitle">오늘 점심</h2>
-        <p class="feature__name"><em>${esc(today.candidates[today.result])}</em></p>
-        <p class="feature__desc" style="margin-top:10px">${esc(H.member(today.by).name)} 님이 ${esc(H.ago(today.at))} 뽑았어요 · 후보 ${today.candidates.map(esc).join(', ')}</p>
-      </div>
-      <div class="feature__foot"><span class="feature__meta">${H.lunch.today().length > 1 ? `오늘 ${H.lunch.today().length}번 뽑았어요` : ''}</span><a class="feature__go" href="lunch.html">다시 뽑기 ${icon('arrow', 16)}</a></div>`
-      : `
-      ${wheel}
-      <span class="feature__top"><span class="pill">점심 뽑기</span></span>
-      <div>
-        <h2 class="feature__name" id="lcTitle">오늘 점심 <em>뭐 먹지?</em></h2>
-        <p class="feature__desc" style="margin-top:10px">후보를 1~4개 넣고 돌림판이나 랜덤 뽑기로 정해요. 결과는 다 같이 봐요.</p>
-      </div>
-      <div class="feature__foot"><span class="feature__meta"></span><a class="feature__go" href="lunch.html">뽑으러 가기 ${icon('arrow', 16)}</a></div>`;
+  /* 대표 툴 */
+  const ft = TOOLS.find(t => t.featured);
+  const fe = $('#feature');
+  if (ft) {
+    const href = H.toolHref(ft);
+    const words = ft.name.split(' ');
+    const name = words.length > 1 ? `${esc(words[0])} <em>${esc(words.slice(1).join(' '))}</em>` : esc(ft.name);
+    fe.href = href || '#';
+    if (/^https?:/.test(href)) { fe.target = '_blank'; fe.rel = 'noopener'; }
+    fe.setAttribute('aria-label', `${ft.name} 열기${/^https?:/.test(href) ? ' (새 탭)' : ''}`);
+    fe.innerHTML = `
+      <span class="bars" aria-hidden="true"><i style="height:38%"></i><i style="height:62%"></i><i style="height:48%"></i><i style="height:84%"></i><i style="height:70%"></i><i style="height:100%"></i></span>
+      <span class="feature__top"><span class="pill pill--live">${esc(ft.status)}</span><span class="pill">대표 업무 툴</span></span>
+      <span>
+        <span class="feature__name" style="display:block">${name}</span>
+        <span class="feature__desc" style="display:block;margin-top:10px">${esc(ft.desc)}. 원본 데이터와 업데이트 파일로 결과 엑셀을 만들고 21개 규칙으로 검사해요.</span>
+      </span>
+      <span class="feature__foot">
+        <span class="feature__meta"><span>담당 ${esc(ft.owner || '-')}</span><span>업데이트 ${esc(ft.updated || '-')}</span>${(ft.tags || []).map(t => `<span>#${esc(t)}</span>`).join('')}</span>
+        <span class="feature__go">툴 열기 ${icon(/^https?:/.test(href) ? 'external' : 'arrow', 16)}</span>
+      </span>`;
+  } else fe.remove();
+
+  /* 업무 툴 카드 (data/tools.js) */
+  function toolCard(t) {
+    const href = H.toolHref(t), soon = !href;
+    const pill = t.status === '준비 중' ? '<span class="pill pill--soon">준비 중</span>' : t.status === '데모' ? '<span class="pill">데모</span>' : `<span class="pill pill--live">${esc(t.status)}</span>`;
+    const inner = `
+      <span class="card__head"><span class="tool__icon">${icon(t.icon, 22)}</span>${pill}</span>
+      <span><span class="tool__name" style="display:block">${esc(t.name)}</span><span class="tool__desc" style="display:block;margin-top:4px">${esc(t.desc)}</span></span>
+      <span class="tool__foot"><span class="tool__tags">${(t.tags || []).map(x => `<span>${esc(x)}</span>`).join('')}</span>${soon ? `<span>${esc(t.owner || '')}</span>` : `<span class="tool__arrow">${icon('arrow', 18)}</span>`}</span>`;
+    return soon
+      ? `<div class="card tool c-4 is-soon" aria-label="${esc(t.name)}, 준비 중">${inner}</div>`
+      : `<a class="card tool c-4" href="${esc(href)}"${/^https?:/.test(href) ? ' target="_blank" rel="noopener"' : ''}>${inner}</a>`;
   }
+  function renderTools(q) {
+    q = (q || '').toLowerCase();
+    const list = TOOLS.filter(t => !t.featured || q);   // 평소엔 대표 툴은 큰 카드로만, 검색 중엔 전부
+    const hits = list.filter(t => !q || (t.name + ' ' + t.desc + ' ' + (t.tags || []).join(' ')).toLowerCase().includes(q));
+    $('#tools').innerHTML = hits.map(toolCard).join('') +
+      (q ? (hits.length ? '' : `<p class="empty no-match">'${esc(q)}'에 맞는 툴이 없어요</p>`)
+        : `<div class="card tool tool--add c-4" role="note"><span>${icon('plus', 22)}</span><b>새 업무 툴 연결</b><span>툴 목록 데이터에 한 줄을 넣으면<br>여기에 카드가 생겨요 <code>data/tools.js</code></span></div>`);
+    $('#toolCount').textContent = q ? `검색 결과 ${hits.length}개` : `전체 ${TOOLS.length}개 · 바로 쓸 수 있는 툴 ${TOOLS.filter(t => t.status !== '준비 중').length}개`;
+  }
+  document.addEventListener('hub:search', (e) => renderTools(e.detail));
 
   /* 공지 — 최근 3개 */
   function renderNotices() {
@@ -70,37 +99,40 @@ window.Hub.boot(function () {
     $('#noticeList').innerHTML = list.length ? list.map(n => `<li><a class="nl" href="notices.html#n-${esc(n.id)}">
         <span class="tag${n.tag === '공지' ? '' : ' tag--gray'}">${esc(n.tag)}</span>
         <span class="grow nl__txt"><b>${esc(n.title)}${n.author !== meId && n.at > seen ? ' <i class="new-dot" aria-label="새 공지"></i>' : ''}</b><small>${esc(H.member(n.author).name)} · ${esc(H.ago(n.at))}</small></span></a></li>`).join('')
-      : `<li class="empty empty--box">${icon('megaphone', 22)}<b>아직 올라온 공지가 없어요</b><span>'공지 쓰기'로 첫 소식을 알려 보세요</span></li>`;
+      : `<li class="empty empty--box">${icon('megaphone', 22)}<b>아직 올라온 공지가 없어요</b><span>'공지 쓰기'로 팀에 첫 소식을 알려 보세요</span></li>`;
   }
   $('#noticeWrite').onclick = () => H.openNoticeEditor();
 
+  /* 최근 활동 — 실제로 한 일(입장·회의 만들기/삭제)만 */
   function renderActivity() {
     const list = H.activity.all().slice(0, 6);
     $('#activityList').innerHTML = list.length ? list.map(a => `<li class="act">${H.avatar(a.who)}<span class="grow"><b>${esc(H.member(a.who).name)}</b> 님이 ${esc(a.what)}<small>${esc(a.where)}</small></span><span class="when">${esc(H.ago(a.at))}</span></li>`).join('')
       : `<li class="empty empty--box">${icon('pulse', 22)}<b>아직 활동이 없어요</b></li>`;
   }
 
-  /* 멤버 + 접속 상태 + 오늘 일정 */
+  /* 팀원 + 접속 상태 */
   const ORDER = { online: 0, meeting: 1, away: 2, offline: 3 };
   function renderTeam() {
     const meId = team.meId();
     const list = team.list().map(m => ({ m, st: team.status(m.id) }))
       .sort((a, b) => (b.m.id === meId) - (a.m.id === meId) || ORDER[a.st] - ORDER[b.st] || a.m.joinedAt - b.m.joinedAt);
-    $('#teamList').innerHTML = list.map(({ m, st }) => {
-      const un = m.id === meId ? 0 : H.messages.unreadFrom(m.id);
-      const td = H.schedules.todayFor(m.id)[0];
-      return `<li>${H.avatar(m.id)}<span class="grow who"><b>${esc(m.name)}${m.id === meId ? ' <span class="muted" style="font-weight:500">(나)</span>' : ''}</b><small>${td ? `<span class="chip chip--${H.schedules.kindClass(td.kind)} chip--sm">오늘 ${esc(td.kind)}</span>` : esc(m.role || TEAM.name)}</small></span><span class="st st--${st}" aria-hidden="true"></span><span class="when">${ST[st]}</span>${m.id === meId ? '<span class="dm-btn dm-btn--ghost" aria-hidden="true"></span>' : `<a class="dm-btn" href="messages.html?to=${encodeURIComponent(m.id)}" aria-label="${esc(m.name)} 님에게 쪽지${un ? `, 안 읽은 쪽지 ${un}개` : ''}" title="쪽지 보내기">${icon('chat', 16)}${un ? `<i class="badge badge--sm">${un}</i>` : ''}</a>`}</li>`;
-    }).join('') + (list.length < 2 ? `<li class="empty empty--hint">초대 링크로 동기들을 불러 보세요</li>` : '');
-    $('#onlineCount').textContent = `${list.length}명 · 접속 ${list.filter(x => x.st !== 'offline').length}명`;
+    $('#teamList').innerHTML = list.map(({ m, st }) => { const un = m.id === meId ? 0 : H.messages.unreadFrom(m.id); return `<li>${H.avatar(m.id)}<span class="grow who"><b>${esc(m.name)}${m.id === meId ? ' <span class="muted" style="font-weight:500">(나)</span>' : ''}</b><small>${esc(m.role)} · ${esc(TEAM.name)}</small></span><span class="st st--${st}" aria-hidden="true"></span><span class="when">${ST[st]}</span>${m.id === meId ? '<span class="dm-btn dm-btn--ghost" aria-hidden="true"></span>' : `<a class="dm-btn" href="messages.html?to=${encodeURIComponent(m.id)}" aria-label="${esc(m.name)} 님에게 쪽지${un ? `, 안 읽은 쪽지 ${un}개` : ''}" title="쪽지 보내기">${icon('chat', 16)}${un ? `<i class="badge badge--sm">${un}</i>` : ''}</a>`}</li>`; }).join('')
+      + (list.length < 2 ? `<li class="empty empty--hint">초대 링크로 팀원을 불러 보세요</li>` : '');
+    const on = list.filter(x => x.st !== 'offline').length;
+    $('#onlineCount').textContent = `${list.length}명 · 접속 ${on}명`;
   }
   $('#inviteBtn').onclick = () => H.openInvite();
 
-  renderStats(); renderWeek(); renderLunch(); renderNotices(); renderActivity(); renderTeam();
-  document.addEventListener('hub:schedules', () => { renderWeek(); renderStats(); renderTeam(); });
-  document.addEventListener('hub:lunch', renderLunch);
+  function refresh() { renderStats(); renderUpcoming(); renderTeam(); }
+  renderHello();
+  renderTools('');
+  refresh();
+  renderActivity();
+  renderNotices();
   document.addEventListener('hub:notices', renderNotices);
-  document.addEventListener('hub:activity', renderActivity);
-  document.addEventListener('hub:messages', () => { renderTeam(); renderStats(); });
+  document.addEventListener('hub:messages', renderTeam);
+  document.addEventListener('hub:meetings', () => { renderStats(); renderUpcoming(); renderActivity(); });
   document.addEventListener('hub:team', () => { renderTeam(); renderStats(); renderActivity(); });
   document.addEventListener('hub:tick', () => { renderTeam(); renderStats(); });
+  document.addEventListener('hub:activity', renderActivity);
 });
