@@ -1,31 +1,30 @@
 /* =========================================================
-   팀 설정 — 팀 이름, 입장 비밀번호, 직급 목록, 바로가기
-   (팀원·회의·활동은 여기 없어요. 시연하면서 직접 들어오고 만든 값만 쓰여요.)
+   사이트 설정 — 이름, Supabase 연결, 일정 종류, 점심 추천 후보, 바로가기
+   (팀원·쪽지·일정 같은 데이터는 여기 없어요. 들어와서 직접 만든 값만 쓰여요.)
    ========================================================= */
 window.HUB_TEAM = {
-  name: 'Team KW',
-  sub: 'Team Hub',
+  name: 'interns',
+  sub: 'Intern Lounge',
 
   // ── Supabase 연결 (실제 DB · 다른 기기끼리 실시간 공유) ──────────────
-  // url·key를 채우면 Supabase 모드, 비워 두면 로컬 모드(이 브라우저에만 저장).
+  // url·key를 채우면 Supabase 모드, 비워 두면 로컬 모드(이 브라우저에만 저장 — 미리보기용).
   // key는 Publishable key(sb_publishable_…) 또는 anon public 키 — 웹페이지에 공개되는 용도라 올려도 괜찮아요.
   // ⚠️ secret / service_role 키는 절대 넣지 마세요.
-  // Supabase 모드의 입장 비밀번호는 아래 password가 아니라 supabase/setup.sql 안의 값이에요(브라우저에서 안 보임).
+  // 입장 비밀번호는 여기가 아니라 Supabase 안에만 있어요(README '비밀번호 정하기').
   supabase: {
-    url: 'https://eguytrrmfqzquidwtipl.supabase.co',
-    key: 'sb_publishable_v-AGhbDz0XJCfN1mcyuvsw_HwXe1qjc',
+    url: 'https://qtkrzcwskqvguujoaicm.supabase.co',
+    key: 'sb_publishable_GPDxwveKIAmAWzM2_tOvGw_q_kiPg9E',
   },
 
-  // 로컬 모드(supabase 값을 비웠을 때)에서만 쓰는 입장 비밀번호 — 페이지 코드에 그대로 보여요.
-  // 지금은 Supabase 모드라 쓰이지 않아서 비워 둠 (비밀번호는 supabase/setup.sql 안에 있음)
+  // 로컬 모드(supabase 값을 비웠을 때)에서만 쓰는 비밀번호 — 페이지 코드에 그대로 보여요
   password: '',
 
-  // 입장할 때 고르는 직급
-  roles: ['팀장', '책임연구원', '선임연구원', '연구원', '연구 인턴'],
+  // 일정 공유에서 고르는 종류 (supabase/setup.sql의 목록과 같아야 해요)
+  scheduleKinds: ['연차', '오전 반차', '오후 반차', '출장', '외근', '교육', '재택', '기타'],
 
-  // 사이드바 바로가기 — 실제 주소가 생기면 href만 바꾸면 돼요 ('#'이면 눌러도 이동 안 함)
-  links: [
-    { name: '팀 공유 드라이브', href: '#', icon: 'folder' },
-    { name: '업무 매뉴얼', href: '#', icon: 'doc' },
-  ],
+  // 점심 뽑기 빠른 추가 후보
+  lunchIdeas: ['김치찌개', '돈까스', '국밥', '마라탕', '쌀국수', '샐러드', '햄버거', '초밥', '제육볶음', '칼국수'],
+
+  // 사이드바 바로가기 — 필요하면 { name: '이름', href: 'https://…', icon: 'link' } 추가
+  links: [],
 };
