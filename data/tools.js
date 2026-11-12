@@ -16,8 +16,11 @@
    ========================================================= */
 // K-pop Live Tracker는 별도 저장소(yun-206/kpop-checker)에 배포된 사이트 — 주소가 바뀌면 여기만 고치면 돼요.
 const KPOP_LIVE_TRACKER_URL = 'https://kpop-checker.vercel.app/';
+// 한류 이슈 모니터는 별도 저장소(yun-206/hallyu_monitor)에 배포된 사이트 — 주소가 바뀌면 여기만 고치면 돼요.
+const HALLYU_MONITOR_URL = 'https://hallyumonitor.vercel.app/';
 
 window.HUB_TOOLS = [
   { id: 'kpop-live-tracker', name: 'K-pop Live Tracker', desc: '케이팝 해외공연 데이터를 조립하고 순위를 매기고 검증해요', href: KPOP_LIVE_TRACKER_URL, icon: 'chart', status: '운영 중', owner: '데이터 TF', updated: '2026-11-02', tags: ['데이터', '검증', '엑셀'], featured: true },
+  { id: 'hallyu-monitor', name: '한류 이슈 모니터', desc: '음악·영상·관광·정책 분야 뉴스와 검색 관심도를 모아 AI로 이슈를 요약해요', href: HALLYU_MONITOR_URL, icon: 'news', status: '운영 중', owner: '데이터 TF', updated: '2026-11-12', tags: ['뉴스', '트렌드', 'AI 요약'] },
   { id: 'meeting', name: '회의 일정 잡기', desc: '팀 주간 캘린더에서 회의를 잡고 참석자를 모아요', href: 'meeting.html', icon: 'calendar', status: '데모', owner: '팀 공용', updated: '2026-11-09', tags: ['협업', '일정'] },
 ];

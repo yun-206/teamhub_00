@@ -53,29 +53,46 @@ window.Hub.boot(function () {
       const isLastMine = mine && !msgs.slice(i + 1).some(y => y.from === meId);
       return `${sep}<div class="bub${mine ? ' bub--me' : ''}"><p>${esc(x.body)}</p><span class="bub__meta">${mine && isLastMine ? (x.readAt ? '읽음 · ' : '안 읽음 · ') : ''}${fmtTime(x.at)}</span></div>`;
     }).join('');
-    const same = renderedFor === current;
-    const keep = same && $('#dmInput') ? $('#dmInput').value : (draft[current] || '');
-    const hadFocus = same && document.activeElement && document.activeElement.id === 'dmInput';
-    renderedFor = current;
-    box.innerHTML = `
-      <header class="dm__head">
+    const head = `
         <button class="icon-btn dm__back" type="button" id="dmBack" aria-label="대화 상대 목록으로">${icon('back', 20)}</button>
         <span class="av-wrap">${H.avatar(current, 'av--lg')}<i class="st st--${st} st--badge" aria-hidden="true"></i></span>
-        <span class="dm__who"><b>${esc(m.name)}</b><small>${esc(m.role)} · ${ST[st]}</small></span>
+        <span class="dm__who"><b>${esc(m.name)}</b><small>${esc(m.role)} · ${ST[st]}</small></span>`;
+    const list = body || `<p class="dm__first">${esc(m.name)} 님에게 첫 쪽지를 보내 보세요 👋</p>`;
+
+    // 같은 대화를 다시 그릴 때(새 쪽지·읽음 표시 등 실시간 갱신)는 머리와 말풍선만 바꾸고
+    // 입력창·폼은 그대로 둔다 — textarea를 새로 만들면 한글 IME 조합이 끊겨 자모로 깨짐(v7 수정)
+    const oldInput = $('#dmInput');
+    if (renderedFor === current && oldInput) {
+      const msgBox = $('#dmMsgs');
+      const atBottom = msgBox.scrollHeight - msgBox.scrollTop - msgBox.clientHeight < 40;
+      const grew = msgs.length !== +(msgBox.dataset.count || 0);
+      $('.dm__head').innerHTML = head;
+      $('#dmBack').onclick = () => open(null);
+      if (msgBox.innerHTML !== list) msgBox.innerHTML = list;
+      msgBox.dataset.count = msgs.length;
+      if (atBottom || grew) msgBox.scrollTop = msgBox.scrollHeight;
+      if (focusInput) oldInput.focus(narrow() ? { preventScroll: true } : undefined);
+      markRead();
+      return;
+    }
+
+    renderedFor = current;
+    box.innerHTML = `
+      <header class="dm__head">${head}
       </header>
-      <div class="dm__msgs" id="dmMsgs" tabindex="0" aria-label="${esc(m.name)} 님과의 쪽지">${body || `<p class="dm__first">${esc(m.name)} 님에게 첫 쪽지를 보내 보세요 👋</p>`}</div>
+      <div class="dm__msgs" id="dmMsgs" tabindex="0" aria-label="${esc(m.name)} 님과의 쪽지" data-count="${msgs.length}">${list}</div>
       <form class="dm__form" id="dmForm">
         <textarea id="dmInput" rows="1" maxlength="500" placeholder="${esc(m.name)} 님에게 쪽지 쓰기" aria-label="쪽지 내용"></textarea>
         <button class="btn btn--accent dm__send" type="submit" id="dmSend" aria-label="보내기">${icon('send', 18)}</button>
       </form>`;
     const input = $('#dmInput');
-    input.value = keep; grow(input);
-    const list = $('#dmMsgs'); list.scrollTop = list.scrollHeight;
+    input.value = draft[current] || ''; grow(input);
+    const msgBox = $('#dmMsgs'); msgBox.scrollTop = msgBox.scrollHeight;
     input.addEventListener('input', () => { draft[current] = input.value; grow(input); });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('#dmForm').requestSubmit(); } });
     $('#dmForm').addEventListener('submit', send);
     $('#dmBack').onclick = () => open(null);
-    if ((focusInput && !narrow()) || hadFocus) input.focus();
+    if (focusInput && !narrow()) input.focus();
     else if (focusInput) input.focus({ preventScroll: true });
     markRead();
   }
@@ -88,7 +105,7 @@ window.Hub.boot(function () {
     sending = true; $('#dmSend').disabled = true;
     try {
       await H.messages.send(current, text);
-      input.value = ''; draft[current] = '';
+      input.value = ''; draft[current] = ''; grow(input);
       renderList(); renderThread(true);
     } catch (er) { console.warn(er); H.toast('쪽지를 보내지 못했어요 · 연결을 확인해 주세요'); }
     finally { sending = false; const b = $('#dmSend'); if (b) b.disabled = false; }
