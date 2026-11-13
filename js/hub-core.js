@@ -103,7 +103,7 @@
   /* =========================================================
      데이터 캐시 — 화면은 항상 여기서 읽고(동기), 쓰기는 백엔드로(비동기)
      ========================================================= */
-  const state = { members: [], meetings: [], activity: [], notices: [], messages: [], online: {}, lastSeen: {} };
+  const state = { members: [], meetings: [], activity: [], notices: [], messages: [], online: {}, lastSeen: {}, meId: null };   // meId: Supabase 모드에서 whoami()가 알려 준 이 기기의 팀원
   const byAtDesc = (a, b) => b.at - a.at;
   const newId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const byDate = (a, b) => (a.date + a.start).localeCompare(b.date + b.start);
@@ -124,6 +124,11 @@
       state.messages = arr(K.messages).slice().sort((a, b) => a.at - b.at);
     },
     async checkPassword(pw) { return pw === TEAM.password; },
+    async memberNames(pw) { if (pw !== TEAM.password) throw new Error('wrong_password'); await this.load(); return state.members.map(m => ({ name: m.name, role: m.role })); },
+    // 이 탭의 '나': 탭 전용(sessionStorage) → 없으면 이 기기 기본(localStorage)
+    meId() { const id = sess.get(K.me, null) || store.get(K.me, null); return id && state.members.some(m => m.id === id) ? id : null; },
+    signIn(id, asTabOnly) { sess.set(K.me, id); const dev = store.get(K.me, null); if (!asTabOnly || !dev || !state.members.some(m => m.id === dev)) store.set(K.me, id); },
+    async signOut() { const id = this.meId(); await this.leave(); sess.del(K.me); if (store.get(K.me, null) === id) store.del(K.me); },
     async join(pw, name, role) {
       if (pw !== TEAM.password) throw new Error('wrong_password');
       await this.load();
@@ -184,8 +189,20 @@
   const fromMessage = (r) => ({ id: r.id, from: r.sender, to: r.recipient, body: r.body, at: Date.parse(r.created_at) || 0, readAt: r.read_at ? Date.parse(r.read_at) : null });
   const fromActivity = (r) => ({ who: r.who, what: r.what, where: r.place || '', at: Date.parse(r.at) || 0 });
   function check(res) { if (res.error) throw res.error; return res.data; }
+  const errMsg = (e) => String((e && (e.message || e.msg)) || e || '');
+  /* v9 보안: 기기마다 익명 로그인 → 입장(join_team)하면 그 기기가 팀원에 연결(member_devices)
+     → 다음부터 whoami()로 바로 들어옴. 모든 표는 RLS로 '입장한 기기'만, 쪽지는 보낸·받은 사람만 */
   const supabaseBackend = {
     mode: 'supabase',
+    async session() { const r = await sb.auth.getSession(); return r && r.data ? r.data.session : null; },
+    async ensureSession() {
+      if (await this.session()) return;
+      const r = await sb.auth.signInAnonymously();
+      if (r.error) throw new Error(/anonymous/i.test(errMsg(r.error)) ? 'anon_disabled' : errMsg(r.error));
+    },
+    meId() { return state.meId && state.members.some(m => m.id === state.meId) ? state.meId : null; },
+    signIn() {},              // 입장한 기기는 서버(member_devices)가 기억 → 브라우저에 따로 저장할 것 없음
+    async signOut() { await this.leave(); },
     async loadMembers() { state.members = check(await sb.from('members').select('*').order('joined_at')).map(fromMember); },
     async loadMeetings() { state.meetings = check(await sb.from('meetings').select('*').order('date').order('start_time')).map(fromMeeting).sort(byDate); },
     async loadActivity() { state.activity = check(await sb.from('activity').select('*').order('at', { ascending: false }).limit(30)).map(fromActivity); },
@@ -195,11 +212,26 @@
       const me = team.meId();
       state.messages = me ? check(await sb.from('messages').select('*').or(`sender.eq.${me},recipient.eq.${me}`).order('created_at').limit(500)).map(fromMessage) : [];
     },
-    async load() { await this.loadMembers(); await Promise.all([this.loadMeetings(), this.loadActivity(), this.loadNotices(), this.loadMessages()]); },
+    async load() {
+      // 로그인(익명) 전이거나 입장 안 한 기기면 아무것도 못 읽음 → 입장 화면으로
+      // meId는 끝까지 확인한 뒤에 바꿈 (중간에 비우면 그 사이 화면 갱신이 알림을 다시 띄울 수 있음)
+      const clear = () => { state.meId = null; state.members = []; state.meetings = []; state.activity = []; state.notices = []; state.messages = []; };
+      if (!(await this.session())) { clear(); return; }
+      const me = check(await sb.rpc('whoami'));
+      if (!me) { clear(); return; }
+      state.meId = me.id;
+      await this.loadMembers(); await Promise.all([this.loadMeetings(), this.loadActivity(), this.loadNotices(), this.loadMessages()]);
+    },
     async checkPassword(pw) { return !!check(await sb.rpc('check_password', { p_password: pw })); },
+    async memberNames(pw) {
+      const r = await sb.rpc('member_names', { p_password: pw });
+      if (r.error) throw new Error(/wrong_password/.test(errMsg(r.error)) ? 'wrong_password' : errMsg(r.error));
+      return Array.isArray(r.data) ? r.data : [];
+    },
     async join(pw, name, role) {
+      await this.ensureSession();
       const res = await sb.rpc('join_team', { p_password: pw, p_name: name, p_role: role });
-      if (res.error) throw new Error(/wrong_password/.test(res.error.message || '') ? 'wrong_password' : (res.error.message || 'join_failed'));
+      if (res.error) throw new Error(/wrong_password/.test(errMsg(res.error)) ? 'wrong_password' : (errMsg(res.error) || 'join_failed'));
       const m = fromMember(res.data.member);
       await this.load();
       return { member: m, isNew: !!res.data.is_new };
@@ -230,20 +262,33 @@
     },
     async resetAll(pw) {
       const res = await sb.rpc('reset_demo', { p_password: pw });
-      if (res.error) throw new Error(/wrong_password/.test(res.error.message || '') ? 'wrong_password' : res.error.message);
+      if (res.error) throw new Error(/wrong_password/.test(errMsg(res.error)) ? 'wrong_password' : errMsg(res.error));
+      if (channel) { try { await channel.untrack(); } catch (e) {} }
+      try { await sb.auth.signOut(); } catch (e) {}
+      state.meId = null;
       sess.keys().filter(k => k.startsWith('teamhub-')).forEach(k => sess.del(k)); store.del(K.me);
     },
     // 접속 상태: Realtime Presence (창을 닫으면 서버가 알아서 빼 줌)
     isOnline(id) { return id === team.meId() || !!state.online[id] || (state.lastSeen[id] && Date.now() - state.lastSeen[id] < GRACE); },   // 지금 이 화면을 보는 나는 항상 접속 중
     manual(id) { const o = state.online[id]; return (o && o.status) || (id === team.meId() ? store.get(K.myStatus + ':' + id, 'online') : 'online'); },
     async setStatus(s) { const id = team.meId(); if (!id) return; store.set(K.myStatus + ':' + id, s); state.online[id] = { status: s }; if (channel) await channel.track({ status: s, at: Date.now() }); },
-    async leave() { if (channel) { try { await channel.untrack(); } catch (e) {} } },
+    // '이 기기에서 나가기': 이 기기 연결만 끊음(팀원 기록은 그대로) → 다음엔 비밀번호 + 이름으로 다시
+    async leave() {
+      if (channel) { try { await channel.untrack(); } catch (e) {} }
+      try { check(await sb.rpc('leave_device')); } catch (e) { console.warn(e); }
+      try { await sb.auth.signOut(); } catch (e) {}
+      state.meId = null;
+    },
     startLive() {
       const id = team.meId();
       let t = {};
       const reload = (what) => { clearTimeout(t[what]); t[what] = setTimeout(async () => {
         try {
-          if (what === 'members') { await this.loadMembers(); if (!team.meId()) { location.replace('join.html'); return; } emit('hub:team'); }
+          if (what === 'members') {
+            const me = check(await sb.rpc('whoami'));
+            if (!me) { location.replace('join.html'); return; }   // 초기화됐거나 이 기기 연결이 끊김
+            await this.loadMembers(); emit('hub:team');
+          }
           if (what === 'meetings') { await this.loadMeetings(); emit('hub:meetings'); emit('hub:team'); }
           if (what === 'activity') { await this.loadActivity(); emit('hub:activity'); }
           if (what === 'notices') { await this.loadNotices(); emit('hub:notices'); }
@@ -264,7 +309,7 @@
         if (status === 'SUBSCRIBED') {
           await channel.track({ status: store.get(K.myStatus + ':' + id, 'online'), at: Date.now() });
           // 연결 전에 바뀐 게 있을 수 있으니 한 번 새로 읽음
-          try { await this.load(); emitAll(); } catch (e) { netError(e); }
+          try { await this.load(); if (!team.meId()) { location.replace('join.html'); return; } emitAll(); } catch (e) { netError(e); }
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           toast('실시간 연결이 잠깐 끊겼어요 · 다시 연결하는 중');
         }
@@ -289,7 +334,8 @@
     if (SB.url && SB.key) {
       try {
         if (!window.supabase) await loadScript(SB_LIB);
-        sb = window.supabase.createClient(SB.url, SB.key, { auth: { persistSession: false, autoRefreshToken: false } });
+        // 익명 로그인 세션을 이 브라우저에 유지 → 한 번 입장한 기기는 다음부터 바로 들어옴
+        sb = window.supabase.createClient(SB.url, SB.key, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'teamhub-auth' } });
         backend = supabaseBackend;
         await backend.load();
         return;
@@ -309,6 +355,7 @@
     all() { return state.meetings.slice(); },
     async add(m) { return backend.addMeeting(Object.assign({ createdAt: Date.now() }, m)); },
     async remove(id) { return backend.removeMeeting(id); },
+    canRemove(m) { const me = team.meId(); return !!me && (m.by === me || (m.attendees || []).includes(me)); },   // 만든 사람·참석자만 (DB 규칙과 같음)
     upcoming(n) { const k = nowKey(); return state.meetings.filter(m => (m.date + ' ' + m.end) > k).slice(0, n || 5); },
     nowFor(id) { const k = nowKey(), d = k.slice(0, 10), t = k.slice(11); return state.meetings.find(m => m.date === d && m.start <= t && m.end > t && (m.attendees || []).includes(id)); },
   };
@@ -359,12 +406,13 @@
     list() { return state.members.slice(); },
     get(id) { return state.members.find(m => m.id === id) || null; },
     findByName(name) { return state.members.find(m => m.name === name) || null; },
-    // 이 탭의 '나': 탭 전용(sessionStorage) → 없으면 이 기기 기본(localStorage)
-    meId() { const id = sess.get(K.me, null) || store.get(K.me, null); return id && this.get(id) ? id : null; },
+    // '나': 로컬 = 탭 전용(sessionStorage) → 없으면 이 기기 기본(localStorage) / Supabase = 이 기기에 연결된 팀원(whoami)
+    meId() { return backend ? backend.meId() : null; },
     me() { return this.get(this.meId()); },
-    signIn(id, asTabOnly) { sess.set(K.me, id); const dev = store.get(K.me, null); if (!asTabOnly || !dev || !this.get(dev)) store.set(K.me, id); },
-    async signOut() { await backend.leave(); const id = this.meId(); sess.del(K.me); if (store.get(K.me, null) === id) store.del(K.me); },
+    signIn(id, asTabOnly) { return backend.signIn(id, asTabOnly); },
+    signOut() { return backend.signOut(); },
     checkPassword(pw) { return backend.checkPassword(pw); },
+    memberNames(pw) { return backend.memberNames(pw); },   // 비밀번호가 맞으면 [{name, role}] (입장 화면 안내용)
     join(pw, name, role) { return backend.join(pw, name, role); },
     resetAll(pw) { return backend.resetAll(pw); },
     setStatus(s) { return backend.setStatus(s); },
@@ -485,8 +533,10 @@
   function showInitError(where) {
     const box = document.createElement('div');
     box.className = 'netfail';
+    // whoami 같은 함수가 없다고 하면 → DB 설정(setup.sql)이 예전 버전
+    const oldSql = /whoami|PGRST202|Could not find the function|does not exist/i.test(errMsg(initError) + ' ' + ((initError && initError.code) || ''));
     box.innerHTML = `<div class="card netfail__card" role="alert">${icon('cloud', 28)}<h1>서버에 연결하지 못했어요</h1>
-      <p>인터넷 연결을 확인하거나 잠시 뒤 다시 열어 주세요.<br>Supabase 무료 프로젝트는 오래 안 쓰면 잠들어요 — 대시보드에서 <b>Restore</b>를 눌러 깨워 주세요.</p>
+      <p>${oldSql ? '서버 설정이 예전 버전이에요.<br>관리자: Supabase SQL Editor에서 최신 <b>supabase/setup.sql</b>을 다시 Run해 주세요.' : '인터넷 연결을 확인하거나 잠시 뒤 다시 열어 주세요.<br>Supabase 무료 프로젝트는 오래 안 쓰면 잠들어요 — 대시보드에서 <b>Restore</b>를 눌러 깨워 주세요.'}</p>
       <button class="btn btn--accent" type="button" onclick="location.reload()">다시 시도</button></div>`;
     (where || document.body).replaceChildren(box);
   }
@@ -591,7 +641,7 @@
         </div>
         <button type="button" role="menuitem" id="menuInvite">${icon('userPlus', 16)}<span>팀원 초대하기</span></button>
         <button type="button" role="menuitem" id="menuTheme">${icon('sun', 16)}<span>테마 바꾸기</span></button>
-        <button type="button" role="menuitem" id="menuOut">${icon('logout', 16)}<span>이 창에서 나가기</span></button>
+        <button type="button" role="menuitem" id="menuOut">${icon('logout', 16)}<span>${isShared() ? '이 기기에서 나가기' : '이 창에서 나가기'}</span></button>
         <button type="button" role="menuitem" id="menuReset" class="is-danger">${icon('reset', 16)}<span>데모 전체 초기화</span></button>`;
       pm.querySelectorAll('[data-status]').forEach(b => b.onclick = async () => { menu(false); await team.setStatus(b.dataset.status); paintProfile(); emit('hub:team'); toast(`내 상태를 '${ST[b.dataset.status]}'(으)로 바꿨어요`); });
       $('#menuInvite').onclick = () => { menu(false); openInvite(); };

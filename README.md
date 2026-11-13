@@ -12,13 +12,14 @@ K-pop Live Tracker는 별도 저장소(`yun-206/kpop-checker`)의 사이트를 �
 
 ## 입장·팀원
 1. 링크로 처음 들어오면 **비밀번호** → **이름·직급** 입력 → 허브로 (소속팀은 전부 Team KW)
-2. 같은 이름으로 다시 들어오면 새로 만들지 않고 그 팀원으로 이어서 들어가요
-   - 한 번 입장한 기기는 다음부터 바로 허브로 들어가요. 그 기기에서 초대 링크를 다시 눌러도 **'○○ 님으로 계속하기'**가 먼저 떠요(아래 작은 '다른 사람으로 입장하기'는 시연용 새 창 입장에 사용)
+2. **한 번 입장한 기기는 다음부터 비밀번호·이름 없이 바로 허브로** 들어가요(브라우저를 껐다 켜도). 그 기기에서 초대 링크를 다시 눌러도 **'○○ 님으로 계속하기'**가 먼저 떠요(아래 작은 '다른 사람으로 입장하기'는 시연용)
+   - 다른 기기에서 비밀번호 + **같은 이름**으로 들어오면 새 계정이 아니라 기존 계정에 그 기기만 추가돼요(쪽지·회의 그대로). 비밀번호를 맞히면 지금 팀원 이름이 칩으로 떠서 누르기만 하면 돼요
 3. 팀원 상태: 온라인 / 회의 중 / 자리 비움 / 오프라인
    - 프로필 메뉴에서 직접 바꾸기(온라인·회의 중·자리 비움)
    - 지금 진행 중인 회의의 참석자면 자동으로 '회의 중'
    - 창을 닫으면 몇 초 뒤 '오프라인'
-4. 프로필 메뉴: 팀원 초대하기 · 테마 · 이 창에서 나가기 · **데모 전체 초기화**(팀원·회의·활동 전부 삭제 → 시연 리허설 후 처음 상태로)
+4. 프로필 메뉴: 팀원 초대하기 · 테마 · **이 기기에서 나가기**(그 기기 연결만 끊음, 팀원 기록은 그대로 — 로컬 모드는 '이 창에서 나가기') · **데모 전체 초기화**(팀원·회의·공지·쪽지·활동·기기 연결 전부 삭제 → 시연 리허설 후 처음 상태로, 모든 기기가 입장 화면으로)
+5. 회의 삭제는 **만든 사람·참석자만** 할 수 있어요(v9)
 
 ## 공지 · 알림 · 쪽지
 - **공지사항**: 허브 공지 카드나 공지사항 화면의 '공지 쓰기' → 분류(공지·자료·일정)·제목·내용 → 올리기. 팀원 화면의 공지 카드·공지사항 화면에 바로 뜨고, 쓴 사람만 삭제할 수 있어요.
@@ -33,6 +34,7 @@ K-pop Live Tracker는 별도 저장소(`yun-206/kpop-checker`)의 사이트를 �
 | 공유 범위 | **다른 기기·브라우저끼리 실시간** | 같은 브라우저의 탭·창끼리만 |
 | 접속 상태 | Realtime **Presence** (창 닫으면 서버가 감지) | 8초 신호 |
 | 입장 비밀번호 | DB 안(`app_settings`)에서만 비교 — 브라우저에 안 보임 | `team.js`의 `password` (코드에 보임) |
+| 다시 들어오기 | 기기마다 **익명 로그인** 세션(`teamhub-auth`) + 서버의 기기 연결(`member_devices`) | localStorage `teamhub-me`(탭은 sessionStorage) |
 | 사이드바 표시 | 🟢 실시간 DB 연결 · Supabase | 시연용 데모 · 이 브라우저에만 저장돼요 |
 
 Supabase 설정이 있는데 연결에 실패하면(인터넷·프로젝트 일시정지) 로컬로 몰래 바꾸지 않고 "서버에 연결하지 못했어요" 화면을 보여줘요 — 데이터가 두 군데로 갈라지지 않게.
@@ -41,22 +43,31 @@ Supabase 설정이 있는데 연결에 실패하면(인터넷·프로젝트 일�
 
 ## Supabase 연결하기
 1. supabase.com → New project (Region: Northeast Asia (Seoul))
-2. SQL Editor → `supabase/setup.sql` 통째로 붙여넣고 Run (여러 번 실행해도 안전 — **새 버전이 나오면 다시 한 번 Run**하면 새 표만 추가돼요)
-   - 만드는 것: `members`·`meetings`·`activity`·`notices`·`messages` 표, `app_settings`(비밀번호), `join_team`·`check_password`·`reset_demo` 함수, RLS 규칙, Realtime 등록
+2. **Authentication → Sign In / Providers → "Allow anonymous sign-ins" 켜기** (v9부터 필수 — 꺼져 있으면 입장 화면에 '관리자 설정이 필요해요' 안내가 떠요)
+3. SQL Editor → `supabase/setup.sql` 통째로 붙여넣고 Run (여러 번 실행해도 안전, 기존 팀원·회의·공지·쪽지·비밀번호 그대로 — **새 버전이 나오면 다시 한 번 Run**)
+   - 만드는 것: `members`·`meetings`·`activity`·`notices`·`messages`·`member_devices` 표, `app_settings`(비밀번호), `check_password`·`member_names`·`join_team`·`whoami`·`leave_device`·`reset_demo`·`my_member_id` 함수, RLS 규칙, Realtime 등록
+   - 예전 버전(v8 이하)에서 올라오면: 팀원 기록은 그대로지만 기기 연결은 새로 생긴 거라 **모두 한 번만** 비밀번호 + 같은 이름으로 다시 들어오면 돼요. 그 뒤로는 바로 열려요
    - 입장 비밀번호는 처음 실행 때 `'teamkw'`로 들어가고, 다시 실행해도 안 바뀌어요. 바꾸려면 SQL Editor에서 `update public.app_settings set value = '새비밀번호' where key = 'password';`
-3. Project Settings → API Keys → **Project URL**과 **Publishable key**(또는 anon public)를 `data/team.js`의 `supabase`에 넣기
+4. Project Settings → API Keys → **Project URL**과 **Publishable key**(또는 anon public)를 `data/team.js`의 `supabase`에 넣기
    - Publishable/anon 키는 웹페이지에 공개되는 용도라 저장소에 올라가도 괜찮아요(RLS로 보호). **secret·service_role 키는 절대 넣지 말 것**
-4. 무료 프로젝트는 일주일쯤 안 쓰면 일시정지돼요 → 발표 전날 대시보드에서 Restore/접속 확인
+5. 무료 프로젝트는 일주일쯤 안 쓰면 일시정지돼요 → 발표 전날 대시보드에서 Restore/접속 확인
 
-### 보안 규칙 요약 (RLS)
-- `members`: 브라우저는 읽기만. 추가는 비밀번호를 확인하는 `join_team` 함수로만
-- `meetings`: 읽기·추가·삭제 (만든 사람 필수, 시간·글자 수 검사)
-- `activity`: 읽기·추가
-- `notices`: 읽기·추가·삭제 (분류·글자 수 검사)
-- `messages`: 읽기·추가, 수정은 **읽음 시각(`read_at`)만** 가능 · 나 자신에게 보내기 불가
-- `app_settings`: 브라우저에서 읽기 불가
-- ⚠️ 로그인(Supabase Auth) 없이 공개 키로 쓰는 데모라 "내 쪽지는 나만 읽기"를 DB가 강제하진 못해요(화면에서만 내 쪽지를 걸러 보여줌). 실제 서비스로 가면 Auth를 붙여 RLS를 `auth.uid()` 기준으로 바꾸는 게 다음 단계예요.
-- 전체 초기화(`reset_demo`)도 비밀번호가 맞아야 실행
+### 보안 구조 (v9 — 익명 로그인 + 기기 연결)
+- 브라우저는 처음 입장할 때 Supabase **익명 로그인**(`signInAnonymously`)으로 기기마다 auth 사용자 하나를 받아요. 세션은 그 브라우저에 유지(`persistSession`, 키 `teamhub-auth`).
+- 비밀번호를 맞혀 `join_team`하면 서버가 `member_devices(auth_uid → member)`에 이 기기를 그 팀원으로 등록 → 페이지를 열 때 `whoami()`로 확인해서 등록된 기기면 바로 허브, 아니면 입장 화면.
+- 모든 정책은 `to authenticated` + `my_member_id()`(= 지금 기기의 팀원) 기준. **로그인 전(anon)은 표를 아예 못 읽고, 익명 로그인만 하고 입장 안 한 기기는 빈 결과만** 받아요.
+
+| 표 | 읽기 | 쓰기 |
+|---|---|---|
+| `members` | 입장한 기기 | 직접 불가 — `join_team` 함수로만 |
+| `meetings` | 입장한 기기 | 추가: 만든 사람 = 나 · 삭제: 내가 만들었거나 참석자인 회의 |
+| `activity` | 입장한 기기 | 추가: 나로만 |
+| `notices` | 입장한 기기 | 추가: 나로만 · 삭제: 내 공지만 |
+| `messages` | **내가 보냈거나 받은 쪽지만** | 추가: 보낸 사람 = 나 · 수정: 받은 사람이 `read_at`(읽음)만 |
+| `member_devices`, `app_settings` | 불가 | 불가 (함수 안에서만) |
+
+- 함수: `check_password`·`member_names`(비밀번호 맞으면 이름·직급 목록 — 입장 화면 안내용)만 로그인 전에도 실행 가능, `join_team`·`whoami`·`leave_device`·`reset_demo`는 익명 로그인한 기기만. 전체 초기화도 비밀번호가 맞아야 실행.
+- 남은 한계(데모 수준): 비밀번호를 아는 사람은 **아무 이름**으로나 들어올 수 있어요(같은 이름이면 그 사람 계정으로 연결). 실제 서비스라면 이메일·SSO 로그인으로 사람을 확인하는 단계가 필요해요. '나가기'·재입장 때 생기는 익명 auth 사용자는 대시보드 Authentication → Users에 쌓이는데, 데모 규모에선 문제없어요.
 
 ## 파일
 | 파일 | 역할 |
@@ -88,6 +99,7 @@ Supabase 설정이 있는데 연결에 실패하면(인터넷·프로젝트 일�
 - 이 저장소를 Vercel에 연결(빌드 설정 없음, 정적 사이트). 주소: https://teamhub00.vercel.app/
 
 ## 변경 이력
+- v9 (2026-11-13): **보안 단계 업그레이드** — 기기마다 익명 로그인 + `member_devices`·`my_member_id()`·`whoami()`·`leave_device()`. 한 번 입장한 기기는 비밀번호·이름 없이 바로 입장, 다른 기기는 같은 이름이면 기존 계정에 기기 추가. RLS를 전부 `to authenticated` + 입장한 기기 기준으로(쪽지는 보낸·받은 사람만, 읽음은 받은 사람만, 공지 삭제는 쓴 사람만, 회의 삭제는 만든 사람·참석자만). 입장 화면은 비밀번호를 맞힌 뒤 팀원 이름 칩(`member_names`). '이 기기에서 나가기'. **대시보드에서 Allow anonymous sign-ins 켜고 setup.sql 다시 Run 필요**(기존 데이터 유지).
 - v8 (2026-11-12): 업무 툴에 '한류 이슈 모니터' 카드 추가(`data/tools.js` 한 줄 + 주소 상수 `HALLYU_MONITOR_URL`). 다른 사이트라 카드·사이드바 모두 새 탭으로 열려요. 다른 파일·SQL 변경 없음.
 - v7 (2026-11-11): 쪽지 입력 중 실시간 갱신이 오면 한글이 자모로 깨지던 버그 수정 — 같은 대화는 머리·말풍선만 다시 그리고 입력창은 유지. SQL 변경 없음.
 - v6 (2026-11-09): '준비 중' 가상 업무 툴 3개 삭제.

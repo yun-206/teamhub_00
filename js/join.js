@@ -14,10 +14,12 @@
 
     $('#fTeam').textContent = TEAM.name;
     $('#fRole').innerHTML = '<option value="">직급을 골라 주세요</option>' + TEAM.roles.map(r => `<option>${esc(r)}</option>`).join('');
-    if (!team.list().length) $('#jIntro').textContent = '아직 아무도 없는 팀 허브예요. 비밀번호를 입력하고 첫 팀원으로 들어오세요.';
-    else if (!invited) $('#jIntro').textContent = '비밀번호를 입력하고 다시 들어오세요.';
-    $('#jNote').innerHTML = H.isShared()
-      ? `<span class="live-dot" aria-hidden="true"></span>실시간 DB(Supabase)에 저장돼요 · 팀원 ${team.list().length}명`
+    // Supabase 모드는 입장 전 기기가 팀원 목록을 못 읽음(RLS) → 팀원 안내는 비밀번호를 맞힌 뒤에
+    const shared = H.isShared();
+    if (!shared && !team.list().length) $('#jIntro').textContent = '아직 아무도 없는 팀 허브예요. 비밀번호를 입력하고 첫 팀원으로 들어오세요.';
+    else if (!invited) $('#jIntro').textContent = shared ? '전달받은 비밀번호를 입력하고 들어오세요.' : '비밀번호를 입력하고 다시 들어오세요.';
+    $('#jNote').innerHTML = shared
+      ? `<span class="live-dot" aria-hidden="true"></span>실시간 DB(Supabase)에 저장돼요 · 한 번 들어온 기기는 다음부터 바로 열려요`
       : '시연용 데모예요. 입력한 정보는 이 브라우저에만 저장돼요.';
 
     const err = (fid, eid, msg) => { $('#' + eid).textContent = msg; $('#' + fid).closest('.fld').classList.toggle('is-err', !!msg); return !msg; };
@@ -29,24 +31,33 @@
       setTimeout(() => (n === 1 ? $('#fPw') : $('#fName')).focus(), 30);
     };
 
-    let pw = '';
+    let pw = '', names = [];   // names: 비밀번호를 맞히면 받는 지금 팀원 [{name, role}]
     $('#pwForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const v = $('#fPw').value, btn = $('#pwForm button[type=submit]');
       if (!err('fPw', 'ePw', v ? '' : '비밀번호를 입력해 주세요')) return;
       busy(btn, true, '확인 중…');
-      let ok = false;
-      try { ok = await team.checkPassword(v); } catch (er) { err('fPw', 'ePw', '서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요'); busy(btn, false, '다음'); return; }
+      try { names = await team.memberNames(v); }
+      catch (er) {
+        busy(btn, false, '다음');
+        err('fPw', 'ePw', er.message === 'wrong_password' ? '비밀번호가 맞지 않아요' : '서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요');
+        $('#fPw').select(); return;
+      }
       busy(btn, false, '다음');
-      if (!err('fPw', 'ePw', ok ? '' : '비밀번호가 맞지 않아요')) { $('#fPw').select(); return; }
+      err('fPw', 'ePw', '');
       pw = v;
+      $('#returnList').innerHTML = names.length
+        ? `${icon('users', 15)}<span>지금 팀원 ${names.length}명: ${names.map(n => `<button type="button" class="name-chip" data-name="${esc(n.name)}">${esc(n.name)}</button>`).join('')}<small>내 이름을 누르면 이어서 들어가요 — 다른 기기에서 들어와도 같은 계정이에요</small></span>`
+        : `${icon('users', 15)}<span>아직 아무도 없어요. 첫 팀원으로 들어오세요!</span>`;
+      $('#returnList').querySelectorAll('[data-name]').forEach(b => b.onclick = () => { $('#fName').value = b.dataset.name; $('#fName').dispatchEvent(new Event('input')); $('#enterBtn').focus(); });
       step(2);
     });
     $('#backPw').onclick = () => step(1);
 
     // 이미 있는 이름이면 '다시 들어오기'로 안내 (같은 사람으로 이어서)
     $('#fName').addEventListener('input', () => {
-      const m = team.findByName($('#fName').value.trim().replace(/\s+/g, ' '));
+      const v = $('#fName').value.trim().replace(/\s+/g, ' ');
+      const m = names.find(x => x.name === v);
       const r = $('#returning');
       r.hidden = !m;
       if (m) { r.innerHTML = `${icon('users', 15)}<span>이미 있는 팀원이에요. <b>${esc(m.name)}</b>(${esc(m.role)}) 님으로 다시 들어가요.</span>`; if (!$('#fRole').value) $('#fRole').value = m.role; }
@@ -65,6 +76,7 @@
       catch (er) {
         busy(btn, false, label);
         if (er.message === 'wrong_password') { step(1); err('fPw', 'ePw', '비밀번호가 바뀌었어요. 다시 입력해 주세요'); }
+        else if (er.message === 'anon_disabled') err('fName', 'eName', '관리자 설정이 필요해요: Supabase에서 익명 로그인(Allow anonymous sign-ins)을 켜 주세요');
         else err('fName', 'eName', '들어가지 못했어요. 연결을 확인하고 다시 시도해 주세요');
         return;
       }

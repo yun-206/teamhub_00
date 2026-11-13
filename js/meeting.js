@@ -186,9 +186,11 @@ window.Hub.boot(function () {
       <p class="drow">${icon('pin', 16)}<span>${esc(m.place || '장소 미정')}</span></p>
       <div class="dppl">${(m.attendees || []).map(a => `<span class="chip">${H.avatar(a)}${esc(H.member(a).name)}</span>`).join('')}</div>
       ${m.by ? `<p class="muted" style="font-size:13px">${esc(H.member(m.by).name)} 님이 만든 회의예요.</p>` : ''}`;
-    $('#dFoot').innerHTML = `<button class="btn btn--danger" type="button" id="dDel">${icon('trash', 16)}회의 삭제</button><button class="btn btn--accent" type="button" id="dOk">확인</button>`;
+    // 삭제는 만든 사람·참석자만 (DB 규칙과 같음)
+    const canDel = H.meetings.canRemove(m);
+    $('#dFoot').innerHTML = `${canDel ? `<button class="btn btn--danger" type="button" id="dDel">${icon('trash', 16)}회의 삭제</button>` : '<span class="muted" style="font-size:13px;margin-right:auto">만든 사람·참석자만 지울 수 있어요</span>'}<button class="btn btn--accent" type="button" id="dOk">확인</button>`;
     $('#dOk').onclick = () => dd.close();
-    $('#dDel').onclick = async () => {
+    if (canDel) $('#dDel').onclick = async () => {
       try { await H.meetings.remove(m.id); } catch (er) { console.warn(er); H.toast('회의를 지우지 못했어요 · 연결을 확인해 주세요'); return; }
       H.activity.add('회의를 취소했어요', m.title); dd.close(); render(); H.toast(`'${m.title}' 회의를 지웠어요`);
     };
